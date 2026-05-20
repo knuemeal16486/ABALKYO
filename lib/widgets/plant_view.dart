@@ -1,16 +1,22 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
-import 'apple_tree_painter.dart';
-import 'sunflower_painter.dart';
-import 'succulent_painter.dart';
-import 'fern_painter.dart';
+import 'plant3d/engine.dart';
+import 'plant3d/plant_builder.dart';
 
-/// 식물 종류에 맞는 페인터를 골라 그리는 뷰. 단일 애니메이션 컨트롤러를 공유한다.
+/// 식물을 실제 3D로 렌더링. 가로 드래그로 360° 회전(yaw), 두 번 탭하면 정면 복귀.
+/// 3D 씬(가지·잎 모델 좌표)은 성장도/시드/종류가 바뀔 때만 재생성하고,
+/// 매 프레임에는 카메라 회전·바람·투영만 적용해 최적화한다.
 class PlantView extends StatefulWidget {
   final PlantType type;
   final int growthLevel; // 0~100
-  const PlantView({super.key, required this.type, required this.growthLevel});
+  final int seed;
+  const PlantView({
+    super.key,
+    required this.type,
+    required this.growthLevel,
+    required this.seed,
+  });
 
   @override
   State<PlantView> createState() => _PlantViewState();
@@ -19,13 +25,19 @@ class PlantView extends StatefulWidget {
 class _PlantViewState extends State<PlantView>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
-  double _rotationY = 0; // 가로 드래그로 식물을 좌우로 돌려본다 (360°)
+  double _yaw = 0;
+
+  Scene? _scene;
+  int? _cgrowth;
+  int? _cseed;
+  PlantType? _ctype;
+  int? _cmonth;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(seconds: 14))
+        vsync: this, duration: const Duration(seconds: 16))
       ..repeat();
   }
 
@@ -35,44 +47,67 @@ class _PlantViewState extends State<PlantView>
     super.dispose();
   }
 
-  void _onDrag(DragUpdateDetails d) =>
-      setState(() => _rotationY += d.delta.dx * 0.012);
-
-  void _resetRotation() => setState(() => _rotationY = 0);
-
-  CustomPainter _painterFor(double g, double wt) {
-    switch (widget.type) {
-      case PlantType.appleTree:
-        return AppleTreePainter(g, wt, DateTime.now().month);
-      case PlantType.sunflower:
-        return SunflowerPainter(g, wt);
-      case PlantType.succulent:
-        return SucculentPainter(g, wt);
-      case PlantType.fern:
-        return FernPainter(g, wt);
+  Scene _ensureScene() {
+    final month = DateTime.now().month;
+    if (_scene == null ||
+        _cgrowth != widget.growthLevel ||
+        _cseed != widget.seed ||
+        _ctype != widget.type ||
+        _cmonth != month) {
+      _scene = buildPlantScene(
+          widget.type, widget.growthLevel / 100.0, widget.seed, month);
+      _cgrowth = widget.growthLevel;
+      _cseed = widget.seed;
+      _ctype = widget.type;
+      _cmonth = month;
     }
+    return _scene!;
   }
 
   @override
   Widget build(BuildContext context) {
-    final g = widget.growthLevel / 100.0;
+    final scene = _ensureScene();
     return GestureDetector(
-      onHorizontalDragUpdate: _onDrag,
-      onDoubleTap: _resetRotation, // 두 번 탭하면 정면으로 복귀
       behavior: HitTestBehavior.opaque,
+      onHorizontalDragUpdate: (d) =>
+          setState(() => _yaw += d.delta.dx * 0.012),
+      onDoubleTap: () => setState(() => _yaw = 0),
       child: AnimatedBuilder(
         animation: _ctrl,
-        builder: (_, _) => Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.0015) // 원근감
-            ..rotateY(_rotationY),
-          child: CustomPaint(
-            painter: _painterFor(g, _ctrl.value * math.pi * 2),
-            size: Size.infinite,
-          ),
+        builder: (_, _) => CustomPaint(
+          painter: _ScenePainter(scene, _yaw, _ctrl.value),
+          size: Size.infinite,
         ),
       ),
     );
   }
+}
+
+class _ScenePainter extends CustomPainter {
+  final Scene scene;
+  final double yaw;
+  final double windPhase; // 0~1
+  _ScenePainter(this.scene, this.yaw, this.windPhase);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 식물 영역 높이에 맞춰 균일 스케일 (작은 영역에서도 잘리지 않게)
+    final fit = (size.height / 580).clamp(0.45, 2.0);
+    final cam = Cam(
+      yaw: yaw,
+      pitch: -0.14,
+      focal: 900 * fit,
+      camDist: 900,
+      cx: size.width / 2,
+      cy: size.height - 80 * fit,
+      windT: windPhase * math.pi * 2,
+      windAmp: 4.5,
+      refH: 230,
+    );
+    scene.render(canvas, cam);
+  }
+
+  @override
+  bool shouldRepaint(_ScenePainter o) =>
+      o.scene != scene || o.yaw != yaw || o.windPhase != windPhase;
 }

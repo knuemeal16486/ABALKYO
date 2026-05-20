@@ -66,7 +66,7 @@ void main() {
     expect(counts['sad'], 1);
   });
 
-  testWidgets('4종 식물 페인터가 모든 성장 단계에서 예외 없이 그려진다', (tester) async {
+  testWidgets('4종 식물 3D 렌더가 모든 성장 단계·시드에서 예외 없이 그려진다', (tester) async {
     for (final type in PlantType.values) {
       for (final growth in [0, 8, 35, 70, 100]) {
         await tester.pumpWidget(
@@ -75,7 +75,8 @@ void main() {
               body: SizedBox(
                 width: 400,
                 height: 600,
-                child: PlantView(type: type, growthLevel: growth),
+                child: PlantView(
+                    type: type, growthLevel: growth, seed: growth * 7 + 13),
               ),
             ),
           ),

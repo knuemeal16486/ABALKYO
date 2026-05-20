@@ -13,7 +13,8 @@
 
 - 8가지 감정 선택, 사진 한 장 첨부(선택), 자유 일기 작성
 - 날짜별로 바뀌는 글감 프롬프트로 쓸 거리 안내
-- 식물 4종(사과나무 · 해바라기 · 다육식물 · 고사리)을 직접 그린 절차적 애니메이션으로 표현, 사과나무는 한국 기후 기반 사계절 변화 반영
+- 식물 4종(사과나무 · 해바라기 · 다육식물 · 고사리)을 **3D L-system**으로 절차 생성 — 가지 분기·잎차례(황금각)를 적용하고, 같은 종도 **개체 시드에 따라 다른 모습**으로 자랍니다(성장은 끊김 없이 연속). 사과나무는 한국 기후 기반 사계절(잎색·개화·결실·낙엽) 반영
+- 식물을 **가로로 드래그하면 360° 3D 회전**(두 번 탭하면 정면 복귀), 화분도 입체로 렌더링
 - 시간대별 하늘 색감, 감정에 따른 비 연출 등 힐링 비주얼
 - 마음 달력 + 통계 요약, 일기 삭제
 - 정원 도감(다 키운 식물 보관)
@@ -85,10 +86,13 @@ lib/
 │  ├─ teacher_report_screen.dart # 교사용 AI 마음 리포트
 │  └─ settings_screen.dart   # 이름·AI 키·도감·소개·초기화
 ├─ widgets/
-│  ├─ plant_view.dart        # 종류별 페인터 분기
-│  ├─ apple_tree_painter.dart, sunflower_painter.dart,
-│  │  succulent_painter.dart, fern_painter.dart
-│  ├─ paint_utils.dart       # 공통 보간 함수·토분
+│  ├─ plant_view.dart        # 3D 식물 렌더 + 드래그 360° 회전 + 씬 캐시
+│  ├─ plant3d/
+│  │  ├─ engine.dart         # V3·원근카메라·깊이정렬·조명·프리미티브
+│  │  ├─ pot.dart            # 3D 토분(절두원뿔)
+│  │  ├─ apple_tree.dart     # 사과나무 3D L-system(연속 성장·개체 변이)
+│  │  ├─ other_plants.dart   # 해바라기·다육·고사리 3D 생성기
+│  │  └─ plant_builder.dart  # 종류별 3D 씬 생성 분기
 │  ├─ animated_plant_widget.dart # 배경 파티클
 │  └─ seed_picker.dart       # 씨앗 선택 UI
 ├─ theme/app_theme.dart

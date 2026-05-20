@@ -104,22 +104,26 @@ class Plant {
   final PlantType type;
   final int growthLevel;
   final DateTime plantedAt;
+  final int seed; // 같은 종이라도 개체마다 다른 모습이 되도록 하는 난수 시드
 
   Plant({
     required this.type,
     required this.growthLevel,
     required this.plantedAt,
+    required this.seed,
   });
 
   Plant copyWith({
     PlantType? type,
     int? growthLevel,
     DateTime? plantedAt,
+    int? seed,
   }) {
     return Plant(
       type: type ?? this.type,
       growthLevel: growthLevel ?? this.growthLevel,
       plantedAt: plantedAt ?? this.plantedAt,
+      seed: seed ?? this.seed,
     );
   }
 
@@ -139,14 +143,20 @@ class Plant {
         'type': type.name,
         'growthLevel': growthLevel,
         'plantedAt': plantedAt.toIso8601String(),
+        'seed': seed,
       };
 
-  factory Plant.fromJson(Map<String, dynamic> j) => Plant(
-        type: plantTypeFromName(j['type'] as String?),
-        growthLevel: (j['growthLevel'] as num?)?.toInt() ?? 0,
-        plantedAt: DateTime.tryParse(j['plantedAt'] as String? ?? '') ??
-            DateTime.now(),
-      );
+  factory Plant.fromJson(Map<String, dynamic> j) {
+    final planted =
+        DateTime.tryParse(j['plantedAt'] as String? ?? '') ?? DateTime.now();
+    return Plant(
+      type: plantTypeFromName(j['type'] as String?),
+      growthLevel: (j['growthLevel'] as num?)?.toInt() ?? 0,
+      plantedAt: planted,
+      seed: (j['seed'] as num?)?.toInt() ??
+          (planted.millisecondsSinceEpoch & 0x7fffffff),
+    );
+  }
 }
 
 // 다 키운 식물 (정원 도감에 보관)

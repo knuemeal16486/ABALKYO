@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,8 +28,13 @@ class AppProvider with ChangeNotifier {
   String _studentName = '';
   String get studentName => _studentName;
 
-  Plant _currentPlant =
-      Plant(type: PlantType.appleTree, growthLevel: 0, plantedAt: DateTime.now());
+  static int _newSeed() => Random().nextInt(0x7fffffff);
+
+  Plant _currentPlant = Plant(
+      type: PlantType.appleTree,
+      growthLevel: 0,
+      plantedAt: DateTime.now(),
+      seed: _newSeed());
   Plant get currentPlant => _currentPlant;
 
   final List<EmotionEntry> _diaryEntries = [];
@@ -111,8 +117,11 @@ class AppProvider with ChangeNotifier {
   // ── 온보딩 ──────────────────────────────────────────────────────────────
   Future<void> completeOnboarding(String name, PlantType type) async {
     _studentName = name.trim();
-    _currentPlant =
-        Plant(type: type, growthLevel: 0, plantedAt: DateTime.now());
+    _currentPlant = Plant(
+        type: type,
+        growthLevel: 0,
+        plantedAt: DateTime.now(),
+        seed: _newSeed());
     _onboarded = true;
     await _save();
     notifyListeners();
@@ -133,8 +142,11 @@ class AppProvider with ChangeNotifier {
     _diaryEntries.clear();
     _collection.clear();
     _studentName = '';
-    _currentPlant =
-        Plant(type: PlantType.appleTree, growthLevel: 0, plantedAt: DateTime.now());
+    _currentPlant = Plant(
+        type: PlantType.appleTree,
+        growthLevel: 0,
+        plantedAt: DateTime.now(),
+        seed: _newSeed());
     _onboarded = false;
     _isRaining = false;
     _rainTimer?.cancel();
@@ -232,8 +244,11 @@ class AppProvider with ChangeNotifier {
         harvestedAt: DateTime.now(),
       ));
     }
-    _currentPlant =
-        Plant(type: newType, growthLevel: 0, plantedAt: DateTime.now());
+    _currentPlant = Plant(
+        type: newType,
+        growthLevel: 0,
+        plantedAt: DateTime.now(),
+        seed: _newSeed());
     await _save();
     notifyListeners();
   }

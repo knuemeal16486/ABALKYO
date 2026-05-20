@@ -193,6 +193,7 @@ class _PlantTab extends StatelessWidget {
                 child: PlantView(
                   type: plant.type,
                   growthLevel: plant.growthLevel,
+                  seed: plant.seed,
                 ),
               ),
 
