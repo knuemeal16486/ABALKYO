@@ -3,18 +3,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 경량 3D 엔진 — CustomPainter 위에서 동작
-//   · V3 벡터 + Rodrigues 회전
-//   · 원근 투영 카메라(yaw 드래그 회전 + 고정 pitch)
-//   · 깊이 정렬(painter's algorithm)
-//   · 람베르트 조명(뷰 공간 고정 광원) + 가지 원통 음영
-//   · 바람 흔들림(높이 비례)
+// 경량 3D 엔진
+//   · 가지: 베지어 곡선 + 원통형 그라데이션 + 수피 질감(거친 가장자리 + 균열선)
+//   · 잎: 이차 베지어 타원 + 비대칭 + 베이스→팁 그라데이션
+//   · 풍향 애니메이션, 깊이 정렬(painter's algorithm)
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── 공통 헬퍼 ────────────────────────────────────────────────────────────────
 double lp(double a, double b, double t) => a + (b - a) * t.clamp(0.0, 1.0);
 
-/// 부드러운 계단(연속 성장용): [a,b] 구간을 0→1로 매끄럽게
 double sstep(double a, double b, double t) {
   final x = ((t - a) / (b - a)).clamp(0.0, 1.0);
   return x * x * (3 - 2 * x);
@@ -116,7 +113,7 @@ abstract class Prim {
   void draw(Canvas c);
 }
 
-/// 어두워질 때는 단순 스케일, 밝아질 때는 흰색 쪽으로 lerp → 채도 유지
+/// 밝아질 때 흰색 쪽으로 lerp → 채도 유지
 Color _shade(Color base, double l) {
   if (l >= 1.0) {
     final t = ((l - 1.0) * 0.55).clamp(0.0, 1.0);
@@ -135,7 +132,7 @@ Color _shade(Color base, double l) {
   );
 }
 
-/// 가지: 베지어 곡선 윤곽 + 5-stop 원통형 그라데이션 + 스페큘러 하이라이트
+/// 가지: 베지어 윤곽 + 5-stop 원통형 그라데이션 + 수피 질감
 class BranchPrim extends Prim {
   final V3 a, b;
   final double ra, rb;
@@ -144,7 +141,30 @@ class BranchPrim extends Prim {
 
   late Offset _sa, _sb, _perp;
   late double _ras, _rbs;
-  late Color _col; // 깊이 기반 기본 색
+  late Color _col;
+  late Offset _cp1s, _cp2s; // 화면공간 베지어 제어점 (재사용)
+
+  // ── 결정론적 해시 노이즈 [0,1) — 3D 좌표 기반이라 회전해도 안정적 ──
+  static double _n(double x, double y) {
+    final h = (x * 127.1 + y * 311.7).abs();
+    return (math.sin(h) * 43758.5453).abs() % 1.0;
+  }
+
+  // 3차 베지어 위의 점 계산
+  static Offset _beval(
+      Offset pa, Offset cp1, Offset cp2, Offset pb, double t) {
+    final mt = 1 - t;
+    return Offset(
+      mt * mt * mt * pa.dx +
+          3 * mt * mt * t * cp1.dx +
+          3 * mt * t * t * cp2.dx +
+          t * t * t * pb.dx,
+      mt * mt * mt * pa.dy +
+          3 * mt * mt * t * cp1.dy +
+          3 * mt * t * t * cp2.dy +
+          t * t * t * pb.dy,
+    );
+  }
 
   @override
   void project(Cam cam) {
@@ -158,6 +178,9 @@ class BranchPrim extends Prim {
     final len = dir.distance;
     dir = len < 1e-3 ? const Offset(0, -1) : dir / len;
     _perp = Offset(-dir.dy, dir.dx);
+    // 베지어 제어점 캐싱 (draw/bark 에서 재사용)
+    _cp1s = _sa + dir * (len * 0.33);
+    _cp2s = _sa + dir * (len * 0.67);
     final dl = (0.50 + depth / 650).clamp(0.38, 1.0);
     _col = _shade(color, dl);
   }
@@ -165,37 +188,29 @@ class BranchPrim extends Prim {
   @override
   void draw(Canvas c) {
     if (_ras < 0.22 && _rbs < 0.22) return;
-
-    final dir = _sb - _sa;
-    final len = dir.distance;
+    final len = (_sb - _sa).distance;
     if (len < 0.3) return;
-    final nd = dir / len;
 
-    // 베지어 제어점 → 유기적 테이퍼 곡선
-    final cp1 = _sa + nd * (len * 0.33);
-    final cp2 = _sa + nd * (len * 0.67);
-
-    // 왼쪽 곡선 → 오른쪽 곡선 → 닫기
+    // ── 메인 가지 몸통 ──────────────────────────────────────────────
     final path = Path()
       ..moveTo(_sa.dx + _perp.dx * _ras, _sa.dy + _perp.dy * _ras)
       ..cubicTo(
-        cp1.dx + _perp.dx * _ras, cp1.dy + _perp.dy * _ras,
-        cp2.dx + _perp.dx * _rbs, cp2.dy + _perp.dy * _rbs,
-        _sb.dx + _perp.dx * _rbs, _sb.dy + _perp.dy * _rbs,
+        _cp1s.dx + _perp.dx * _ras, _cp1s.dy + _perp.dy * _ras,
+        _cp2s.dx + _perp.dx * _rbs, _cp2s.dy + _perp.dy * _rbs,
+        _sb.dx + _perp.dx * _rbs,   _sb.dy + _perp.dy * _rbs,
       )
       ..lineTo(_sb.dx - _perp.dx * _rbs, _sb.dy - _perp.dy * _rbs)
       ..cubicTo(
-        cp2.dx - _perp.dx * _rbs, cp2.dy - _perp.dy * _rbs,
-        cp1.dx - _perp.dx * _ras, cp1.dy - _perp.dy * _ras,
-        _sa.dx - _perp.dx * _ras, _sa.dy - _perp.dy * _ras,
+        _cp2s.dx - _perp.dx * _rbs, _cp2s.dy - _perp.dy * _rbs,
+        _cp1s.dx - _perp.dx * _ras, _cp1s.dy - _perp.dy * _ras,
+        _sa.dx - _perp.dx * _ras,   _sa.dy - _perp.dy * _ras,
       )
       ..close();
 
     final maxR = math.max(_ras, _rbs);
-    final mid = Offset((_sa.dx + _sb.dx) * 0.5, (_sa.dy + _sb.dy) * 0.5);
+    final mid  = Offset((_sa.dx + _sb.dx) * 0.5, (_sa.dy + _sb.dy) * 0.5);
     final pLen = maxR * 1.18;
 
-    // 5-stop 원통형 그라데이션: 그림자 가장자리 → 중간 → 하이라이트 → 중간 → 그림자
     c.drawPath(
       path,
       Paint()
@@ -203,17 +218,17 @@ class BranchPrim extends Prim {
           Offset(mid.dx + _perp.dx * pLen, mid.dy + _perp.dy * pLen),
           Offset(mid.dx - _perp.dx * pLen, mid.dy - _perp.dy * pLen),
           [
-            _shade(_col, 0.28),
-            _shade(_col, 0.65),
-            _shade(_col, 1.50),
-            _shade(_col, 0.68),
-            _shade(_col, 0.30),
+            _shade(_col, 0.28), _shade(_col, 0.65),
+            _shade(_col, 1.50), _shade(_col, 0.68), _shade(_col, 0.30),
           ],
           [0.0, 0.18, 0.40, 0.70, 1.0],
         ),
     );
 
-    // 스페큘러 하이라이트 선 (두꺼운 가지에서만)
+    // ── 수피 질감 ────────────────────────────────────────────────────
+    _drawBark(c, maxR);
+
+    // ── 스페큘러 하이라이트 ──────────────────────────────────────────
     if (maxR > 1.6) {
       c.drawPath(
         Path()
@@ -222,10 +237,10 @@ class BranchPrim extends Prim {
             _sa.dy + _perp.dy * _ras * 0.08,
           )
           ..cubicTo(
-            cp1.dx + _perp.dx * _ras * 0.10,
-            cp1.dy + _perp.dy * _ras * 0.10,
-            cp2.dx + _perp.dx * _rbs * 0.13,
-            cp2.dy + _perp.dy * _rbs * 0.13,
+            _cp1s.dx + _perp.dx * _ras * 0.10,
+            _cp1s.dy + _perp.dy * _ras * 0.10,
+            _cp2s.dx + _perp.dx * _rbs * 0.13,
+            _cp2s.dy + _perp.dy * _rbs * 0.13,
             _sb.dx + _perp.dx * _rbs * 0.13,
             _sb.dy + _perp.dy * _rbs * 0.13,
           ),
@@ -237,9 +252,76 @@ class BranchPrim extends Prim {
       );
     }
   }
+
+  /// 수피 질감: 거친 가장자리 선 + 세로 균열
+  void _drawBark(Canvas c, double maxR) {
+    // 3D 좌표 기반 시드 — 카메라 회전해도 같은 패턴 유지
+    final sx = a.x * 73.7 + a.z * 31.3;
+    final sy = b.x * 17.9 + b.z * 41.1;
+
+    // 1. 거친 실루엣 가장자리
+    const edgeSteps = 10;
+    final jitter = maxR * 0.12;
+    for (final side in [1.0, -1.0]) {
+      final ep = Path();
+      for (int i = 0; i <= edgeSteps; i++) {
+        final t = i / edgeSteps;
+        final bp = _beval(_sa, _cp1s, _cp2s, _sb, t);
+        final curR = lp(_ras, _rbs, t);
+        final noise =
+            (_n(sx + i * 7.3 + side * 99.1, sy + i * 11.7) - 0.5) * jitter;
+        final px = bp.dx + _perp.dx * (curR * side + noise);
+        final py = bp.dy + _perp.dy * (curR * side + noise);
+        if (i == 0) ep.moveTo(px, py);
+        else ep.lineTo(px, py);
+      }
+      c.drawPath(
+        ep,
+        Paint()
+          ..color = _shade(_col, side > 0 ? 0.30 : 0.18)
+              .withValues(alpha: 0.38)
+          ..strokeWidth = maxR * 0.14
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+
+    // 2. 세로 수피 균열선 (굵은 가지에서만)
+    if (maxR > 2.6) {
+      final numCracks = (maxR / 5.5).floor().clamp(1, 4);
+      for (int ci = 0; ci < numCracks; ci++) {
+        final crackOff =
+            (numCracks > 1 ? ci / (numCracks - 1.0) - 0.5 : 0.0) *
+                maxR * 0.80;
+        final cp = Path();
+        for (int j = 0; j <= 8; j++) {
+          final t = j / 8.0;
+          final bp = _beval(_sa, _cp1s, _cp2s, _sb, t);
+          final noise = (_n(sx + ci * 23.1 + j * 9.3,
+                          sy + ci * 11.5 + j * 4.7) -
+                      0.5) *
+                  maxR *
+                  0.13;
+          final px = bp.dx + _perp.dx * (crackOff + noise);
+          final py = bp.dy + _perp.dy * (crackOff + noise);
+          if (j == 0) cp.moveTo(px, py);
+          else cp.lineTo(px, py);
+        }
+        c.drawPath(
+          cp,
+          Paint()
+            ..color = _shade(_col, 0.16).withValues(alpha: 0.34)
+            ..strokeWidth = 0.60
+            ..style = PaintingStyle.stroke
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    }
+  }
 }
 
-/// 잎·꽃잎·화분 면 — 4점: 베지어 타원형 잎, 3점: 직선 삼각형
+/// 잎·꽃잎·화분면 — 4점 베지어 타원형, 3점 직선
 class QuadPrim extends Prim {
   final List<V3> v;
   final V3 normal;
@@ -271,25 +353,21 @@ class QuadPrim extends Prim {
   @override
   void draw(Canvas c) {
     final path = _bezierPath();
-
     if (veinColor != null && _s.length >= 4) {
-      // 잎: 베이스→팁 방향 그라데이션
       final base = _s[0];
-      final tip = _s[2];
+      final tip  = _s[2];
       c.drawPath(
         path,
         Paint()
           ..shader = ui.Gradient.linear(
-            base,
-            tip,
+            base, tip,
             [_shade(_c, 0.72), _c, _shade(_c, 1.14)],
             [0.0, 0.45, 1.0],
           ),
       );
       if (_veinA != null) {
         c.drawLine(
-          _veinA!,
-          _veinB!,
+          _veinA!, _veinB!,
           Paint()
             ..color = veinColor!.withValues(alpha: 0.50)
             ..strokeWidth = 0.90
@@ -298,33 +376,19 @@ class QuadPrim extends Prim {
       }
     } else {
       c.drawPath(path, Paint()..color = _c);
-      if (_veinA != null) {
-        c.drawLine(
-          _veinA!,
-          _veinB!,
-          Paint()
-            ..color = veinColor!.withValues(alpha: 0.50)
-            ..strokeWidth = 0.90
-            ..strokeCap = StrokeCap.round,
-        );
-      }
     }
   }
 
   Path _bezierPath() {
     if (_s.length != 4) {
-      // 3점 삼각형 (흙, 꽃 원반 등) → 직선
       final path = Path()..moveTo(_s[0].dx, _s[0].dy);
-      for (int i = 1; i < _s.length; i++) {
-        path.lineTo(_s[i].dx, _s[i].dy);
-      }
+      for (int i = 1; i < _s.length; i++) path.lineTo(_s[i].dx, _s[i].dy);
       return path..close();
     }
-    // 4점 다이아몬드 → 이차 베지어 타원형 잎
-    final base = _s[0]; // 줄기 부착점
-    final lft  = _s[1]; // 왼쪽 폭 최대점
-    final tip  = _s[2]; // 잎끝
-    final rgt  = _s[3]; // 오른쪽 폭 최대점
+    final base = _s[0];
+    final lft  = _s[1];
+    final tip  = _s[2];
+    final rgt  = _s[3];
     return Path()
       ..moveTo(base.dx, base.dy)
       ..quadraticBezierTo(lft.dx, lft.dy, tip.dx, tip.dy)
@@ -333,7 +397,7 @@ class QuadPrim extends Prim {
   }
 }
 
-/// 구체 느낌의 빌보드(열매·꽃 중심). 방사형 그라데이션 + 스페큘러
+/// 구체 빌보드 (열매·꽃 중심)
 class SpherePrim extends Prim {
   final V3 center;
   final double radius;
@@ -357,32 +421,26 @@ class SpherePrim extends Prim {
     if (_r < 0.5) return;
     if (glossy) {
       c.drawCircle(
-        _c,
-        _r * 2.4,
+        _c, _r * 2.4,
         Paint()
           ..color = color.withValues(alpha: 0.16)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 1.4),
       );
       final hl = _c + Offset(-_r * 0.30, -_r * 0.35);
       c.drawCircle(
-        _c,
-        _r,
+        _c, _r,
         Paint()
           ..shader = ui.Gradient.radial(hl, _r * 1.4, [
-            _shade(color, 1.55),
-            color,
-            _shade(color, 0.55),
+            _shade(color, 1.55), color, _shade(color, 0.55),
           ], [0.0, 0.40, 1.0]),
       );
       c.drawCircle(
-        _c + Offset(-_r * 0.26, -_r * 0.30),
-        _r * 0.22,
+        _c + Offset(-_r * 0.26, -_r * 0.30), _r * 0.22,
         Paint()..color = const Color(0xAAFFFFFF),
       );
     } else {
       c.drawCircle(
-        _c,
-        _r * 1.7,
+        _c, _r * 1.7,
         Paint()
           ..color = color.withValues(alpha: 0.12)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 0.9),
@@ -398,12 +456,8 @@ class Scene {
   void add(Prim p) => prims.add(p);
 
   void render(Canvas canvas, Cam cam) {
-    for (final p in prims) {
-      p.project(cam);
-    }
+    for (final p in prims) p.project(cam);
     prims.sort((a, b) => a.depth.compareTo(b.depth));
-    for (final p in prims) {
-      p.draw(canvas);
-    }
+    for (final p in prims) p.draw(canvas);
   }
 }
