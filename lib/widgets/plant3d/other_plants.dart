@@ -72,11 +72,20 @@ void buildSunflower(Scene scene, double g, int seed) {
 
 void _sunflowerHead(Scene scene, V3 center, V3 normal, double g, double grow) {
   final bloom = sstep(0.6, 0.9, g);
-  if (bloom < 0.05) {
-    scene.add(SpherePrim(center, lp(4, 12, grow), const Color(0xFF66BB6A),
-        glossy: false));
-    return;
+
+  // 봉오리 → 만개 크로스페이드: 봉오리는 bloom 0→0.12에서 페이드아웃
+  final budAlpha = (1.0 - bloom / 0.12).clamp(0.0, 1.0);
+  if (budAlpha > 0.02) {
+    scene.add(SpherePrim(
+        center,
+        lp(4, 14, grow),
+        Color(0xFF4CB87E).withValues(alpha: budAlpha),
+        glossy: true));
   }
+  if (bloom < 0.04) return;
+
+  // 꽃잎은 bloom 0.04→0.16에서 페이드인
+  final petalAlpha = ((bloom - 0.04) / 0.12).clamp(0.0, 1.0);
   final diskR = lp(8, 24, bloom);
   final petalLen = lp(12, 32, bloom);
   final u = normal.anyPerp;
@@ -90,29 +99,29 @@ void _sunflowerHead(Scene scene, V3 center, V3 normal, double g, double grow) {
     final t = (u * -math.sin(ang) + v * math.cos(ang)).normalized;
     final baseP = center + d * (diskR * 0.9);
     final tipP = center + d * (diskR + petalLen * (1 - seeding * 0.2));
-    // My Oasis 스타일 — 따뜻한 황금 꽃잎, 끝으로 갈수록 밝아짐
     final petalColor = Color.lerp(
-        const Color(0xFFFFB74D), const Color(0xFFFFF176),
-        (i / 22.0))!;
+        const Color(0xFFFFB74D), const Color(0xFFFFF176), i / 22.0)!;
     scene.add(QuadPrim([
       baseP + t * (petalLen * 0.16),
       tipP,
       baseP - t * (petalLen * 0.16),
-    ], normal, petalColor));
+    ], normal, petalColor.withValues(alpha: petalAlpha)));
   }
   // 씨앗 원반
   const seg = 18;
   final diskColor =
       Color.lerp(const Color(0xFF6D4C41), const Color(0xFF3E2723), seeding)!;
+  final diskAlpha = petalAlpha;
   for (int i = 0; i < seg; i++) {
     final a0 = i / seg * 2 * math.pi;
     final a1 = (i + 1) / seg * 2 * math.pi;
     final p0 = center + (u * math.cos(a0) + v * math.sin(a0)) * diskR;
     final p1 = center + (u * math.cos(a1) + v * math.sin(a1)) * diskR;
-    scene.add(QuadPrim([center, p0, p1], normal, diskColor));
+    scene.add(QuadPrim(
+        [center, p0, p1], normal, diskColor.withValues(alpha: diskAlpha)));
   }
   scene.add(SpherePrim(center + normal * 0.5, diskR * 0.45,
-      const Color(0xFF4E342E), glossy: false));
+      Color(0xFF4E342E).withValues(alpha: diskAlpha), glossy: false));
 }
 
 // ── 다육식물 (로제트) ────────────────────────────────────────────────────────
@@ -215,9 +224,10 @@ void _frond(Scene scene, V3 right, V3 planeN, double len, double open,
       }
     }
   }
-  // 피들헤드(코일 끝) — 밝은 연두
-  if (open < 0.97) {
-    scene.add(SpherePrim(p, lp(3.5, 1.0, open), const Color(0xFF8ED86A),
-        glossy: true));
+  // 피들헤드(코일 끝) — open 0.85~0.97에서 서서히 페이드아웃
+  final fiddleAlpha = (1.0 - sstep(0.82, 0.97, open)).clamp(0.0, 1.0);
+  if (fiddleAlpha > 0.02) {
+    scene.add(SpherePrim(p, lp(3.5, 1.0, open),
+        const Color(0xFF8ED86A).withValues(alpha: fiddleAlpha), glossy: true));
   }
 }
