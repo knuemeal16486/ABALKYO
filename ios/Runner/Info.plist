@@ -47,6 +47,9 @@
 			</array>
 		</dict>
 	</dict>
+	<!-- 위치: 현재 날씨로 일기 작성 힌트 제공 -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>오늘의 날씨를 가져와 일기 주제를 추천해드려요 🌤</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
