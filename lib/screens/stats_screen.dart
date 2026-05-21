@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 import 'achievements_screen.dart';
 
 class StatsScreen extends StatelessWidget {
@@ -14,19 +15,8 @@ class StatsScreen extends StatelessWidget {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0D1F14), Color(0xFF1B3A2D)],
-              ),
-            ),
-          ),
-          SafeArea(
+      body: WarmBackground(
+        child: SafeArea(
             child: Column(
               children: [
                 Padding(
@@ -92,8 +82,7 @@ class StatsScreen extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
+        ),
     );
   }
 }
@@ -112,14 +101,9 @@ class _StreakCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF2E5D3B).withValues(alpha: 0.8),
-            const Color(0xFF1B3A2D).withValues(alpha: 0.9),
-          ],
-        ),
+        color: Colors.white.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppTheme.softMoss.withValues(alpha: 0.35)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
       ),
       child: Row(
         children: [
@@ -455,7 +439,7 @@ class _EmotionPersonality extends StatelessWidget {
         gradient: LinearGradient(
           colors: [
             color.withValues(alpha: 0.18),
-            const Color(0xFF1B3A2D).withValues(alpha: 0.85),
+            Colors.black.withValues(alpha: 0.35),
           ],
         ),
         borderRadius: BorderRadius.circular(26),

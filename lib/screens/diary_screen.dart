@@ -8,6 +8,7 @@ import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../services/weather_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 import 'ai_diary_result_screen.dart';
 
 class DiaryScreen extends StatefulWidget {
@@ -153,31 +154,20 @@ class _DiaryScreenState extends State<DiaryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF0D1F14), Color(0xFF1B3A2D)],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                // 헤더
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => widget.onSubmit?.call(),
-                        child: const Icon(Icons.arrow_back_ios_rounded,
-                            color: AppTheme.dawnGlow, size: 22),
+      body: WarmBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 헤더
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => widget.onSubmit?.call(),
+                      child: const Icon(Icons.arrow_back_ios_rounded,
+                          color: AppTheme.dawnGlow, size: 22),
                       ),
                       const SizedBox(width: 12),
                       const Text('오늘의 마음 일기',
@@ -328,7 +318,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

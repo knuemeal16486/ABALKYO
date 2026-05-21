@@ -5,6 +5,7 @@ import '../models/achievement.dart';
 import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 import 'achievements_screen.dart';
 import 'stats_screen.dart';
 import 'teacher_report_screen.dart';
@@ -18,78 +19,66 @@ class SettingsScreen extends StatelessWidget {
     final df = DateFormat('M월 d일', 'ko_KR');
 
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF0D1F14), Color(0xFF1B3A2D)],
+      body: WarmBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.arrow_back_ios_rounded,
+                          color: AppTheme.dawnGlow, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('설정',
+                        style: TextStyle(
+                            color: AppTheme.dawnGlow,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: const Icon(Icons.arrow_back_ios_rounded,
-                            color: AppTheme.dawnGlow, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('설정',
-                          style: TextStyle(
-                              color: AppTheme.dawnGlow,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold)),
-                    ],
-                  ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  children: [
+                    _SectionTitle('내 이름'),
+                    _NameTile(name: provider.studentName),
+                    const SizedBox(height: 24),
+
+                    _SectionTitle('교사용 AI 설정'),
+                    _ApiKeyTile(hasKey: provider.aiEnabled),
+                    const SizedBox(height: 12),
+                    _ReportTile(enabled: provider.aiEnabled),
+                    const SizedBox(height: 24),
+
+                    _SectionTitle('감정 기록 & 성취'),
+                    _StatsTile(),
+                    const SizedBox(height: 12),
+                    _AchievementsTile(provider: provider),
+                    const SizedBox(height: 24),
+
+                    _SectionTitle('정원 도감 (다 키운 식물)'),
+                    _CollectionCard(provider: provider, df: df),
+                    const SizedBox(height: 24),
+
+                    _SectionTitle('마음 정원 소개'),
+                    _InfoCard(),
+                    const SizedBox(height: 24),
+
+                    _SectionTitle('다음 사람을 위해'),
+                    _ResetTile(),
+                    const SizedBox(height: 40),
+                  ],
                 ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    children: [
-                      _SectionTitle('내 이름'),
-                      _NameTile(name: provider.studentName),
-                      const SizedBox(height: 24),
-
-                      _SectionTitle('교사용 AI 설정'),
-                      _ApiKeyTile(hasKey: provider.aiEnabled),
-                      const SizedBox(height: 12),
-                      _ReportTile(enabled: provider.aiEnabled),
-                      const SizedBox(height: 24),
-
-                      _SectionTitle('감정 기록 & 성취'),
-                      _StatsTile(),
-                      const SizedBox(height: 12),
-                      _AchievementsTile(provider: provider),
-                      const SizedBox(height: 24),
-
-                      _SectionTitle('정원 도감 (다 키운 식물)'),
-                      _CollectionCard(provider: provider, df: df),
-                      const SizedBox(height: 24),
-
-                      _SectionTitle('마음 정원 소개'),
-                      _InfoCard(),
-                      const SizedBox(height: 24),
-
-                      _SectionTitle('다음 사람을 위해'),
-                      _ResetTile(),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -110,9 +99,9 @@ class _SectionTitle extends StatelessWidget {
 }
 
 BoxDecoration _cardDeco() => BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.06),
+      color: Colors.white.withValues(alpha: 0.09),
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppTheme.softMoss.withValues(alpha: 0.2)),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
     );
 
 class _NameTile extends StatelessWidget {
@@ -124,7 +113,7 @@ class _NameTile extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: AppTheme.midForest,
+        backgroundColor: const Color(0xFF2D1550),
         title: const Text('이름 바꾸기',
             style: TextStyle(color: AppTheme.dawnGlow)),
         content: TextField(
@@ -190,7 +179,7 @@ class _ApiKeyTile extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: AppTheme.midForest,
+        backgroundColor: const Color(0xFF2D1550),
         title: const Text('Gemini API 키',
             style: TextStyle(color: AppTheme.dawnGlow, fontSize: 18)),
         content: Column(
@@ -413,7 +402,7 @@ class _ReportTile extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('먼저 위에서 Gemini API 키를 입력해주세요.'),
-              backgroundColor: AppTheme.midForest,
+              backgroundColor: const Color(0xFF2D1550),
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
@@ -593,7 +582,7 @@ class _ResetTile extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: AppTheme.midForest,
+        backgroundColor: const Color(0xFF2D1550),
         title: const Text('정원을 초기화할까요?',
             style: TextStyle(color: AppTheme.dawnGlow, fontSize: 18)),
         content: Text(

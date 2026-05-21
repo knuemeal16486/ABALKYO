@@ -296,14 +296,14 @@ class _PrimaryButton extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 30),
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.5),
+          color: Colors.white.withValues(alpha: 0.32),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
           boxShadow: [
             BoxShadow(
-                color: Colors.white.withValues(alpha: 0.3),
-                blurRadius: 16,
-                spreadRadius: 1),
+                color: Colors.white.withValues(alpha: 0.22),
+                blurRadius: 20,
+                spreadRadius: 2),
           ],
         ),
         child: Row(

@@ -5,6 +5,7 @@ import '../models/achievement.dart';
 import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 
 class AchievementsScreen extends StatelessWidget {
   const AchievementsScreen({super.key});
@@ -34,19 +35,8 @@ class AchievementsScreen extends StatelessWidget {
     final unlocked = kAchievements.where((a) => _check(a, provider)).length;
 
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0D1F14), Color(0xFF1B3A2D)],
-              ),
-            ),
-          ),
-          SafeArea(
+      body: WarmBackground(
+        child: SafeArea(
             child: Column(
               children: [
                 Padding(
@@ -147,8 +137,7 @@ class AchievementsScreen extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
+        ),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -22,56 +23,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF0D1F14), Color(0xFF1B3A2D)],
+      body: WarmBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 헤더
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Icon(Icons.arrow_back_ios_rounded,
+                          color: AppTheme.dawnGlow, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('마음 달력',
+                        style: TextStyle(
+                            color: AppTheme.dawnGlow,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                // 헤더
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: const Icon(Icons.arrow_back_ios_rounded,
-                            color: AppTheme.dawnGlow, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('마음 달력',
-                          style: TextStyle(
-                              color: AppTheme.dawnGlow,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold)),
-                    ],
-                  ),
+              Expanded(
+                child: ListView(
+                  children: [
+                    _StatsCard(provider: provider),
+                    _buildCalendar(provider),
+                    Divider(
+                        color: Colors.white.withValues(alpha: 0.1), height: 1),
+                    _buildSelectedHeader(),
+                    _buildEntries(provider),
+                  ],
                 ),
-                Expanded(
-                  child: ListView(
-                    children: [
-                      _StatsCard(provider: provider),
-                      _buildCalendar(provider),
-                      const Divider(color: Color(0xFF2D5A3D), height: 1),
-                      _buildSelectedHeader(),
-                      _buildEntries(provider),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -181,9 +171,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
           margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: Colors.white.withValues(alpha: 0.09),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppTheme.softMoss.withValues(alpha: 0.2)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,7 +255,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
-        backgroundColor: AppTheme.midForest,
+        backgroundColor: const Color(0xFF2D1550),
         title: const Text('이 기록을 지울까요?',
             style: TextStyle(color: AppTheme.dawnGlow, fontSize: 18)),
         content: Text('지운 기록은 되돌릴 수 없어요.',
