@@ -47,7 +47,7 @@ void buildSunflower(Scene scene, double g, int seed) {
     dir = dir.rotateAxis(bendAxis, bend).normalized;
     final end = pos + dir * segLen;
     scene.add(BranchPrim(pos, end, lp(2.2, 9, grow) * (1 - i / segs * 0.35),
-        lp(2.0, 8, grow) * (1 - (i + 1) / segs * 0.35), const Color(0xFF558B2F)));
+        lp(2.0, 8, grow) * (1 - (i + 1) / segs * 0.35), const Color(0xFF5FA84E)));
     pos = end;
     nodes.add(pos);
     dirs.add(dir);
@@ -61,7 +61,7 @@ void buildSunflower(Scene scene, double g, int seed) {
       final outDir = (h + const V3(0, 0.35, 0)).normalized;
       final lg = sstep(0.18 + i * 0.05, 0.5 + i * 0.05, g);
       _leafQuad(scene, nodes[i], outDir, lp(20, 60, lg) * (1 - i * 0.12),
-          lp(14, 40, lg) * (1 - i * 0.12), const Color(0xFF43A047));
+          lp(14, 40, lg) * (1 - i * 0.12), const Color(0xFF4DB86E));
     }
   }
 
@@ -90,11 +90,15 @@ void _sunflowerHead(Scene scene, V3 center, V3 normal, double g, double grow) {
     final t = (u * -math.sin(ang) + v * math.cos(ang)).normalized;
     final baseP = center + d * (diskR * 0.9);
     final tipP = center + d * (diskR + petalLen * (1 - seeding * 0.2));
+    // My Oasis 스타일 — 따뜻한 황금 꽃잎, 끝으로 갈수록 밝아짐
+    final petalColor = Color.lerp(
+        const Color(0xFFFFB74D), const Color(0xFFFFF176),
+        (i / 22.0))!;
     scene.add(QuadPrim([
       baseP + t * (petalLen * 0.16),
       tipP,
       baseP - t * (petalLen * 0.16),
-    ], normal, const Color(0xFFF9A825)));
+    ], normal, petalColor));
   }
   // 씨앗 원반
   const seg = 18;
@@ -132,19 +136,20 @@ void buildSucculent(Scene scene, double g, int seed) {
         .normalized;
     final len = lp(46, 14, t) * lg;
     final width = len * 0.5;
+    // My Oasis 다육식물 — 청록빛 세이지 톤, 끝은 핑크/코랄
     _leafQuad(scene, center + dir * (len * 0.08), dir, len, width,
-        Color.lerp(const Color(0xFF66BB6A), const Color(0xFF43A047), t)!,
-        tip: const Color(0xFFE57373), tipFrac: color);
+        Color.lerp(const Color(0xFF72C8A6), const Color(0xFF4A9E7A), t)!,
+        tip: const Color(0xFFF06292), tipFrac: color);
   }
   scene.add(SpherePrim(center, lp(3, 7, sstep(0, 0.5, g)),
-      Color.lerp(const Color(0xFF43A047), const Color(0xFFE57373), color)!,
-      glossy: false));
+      Color.lerp(const Color(0xFF4DB886), const Color(0xFFF06292), color)!,
+      glossy: true));
 
   // 희귀한 개화
   if (g >= 0.97) {
     final stalkTop = center + const V3(8, 40, 4);
-    scene.add(BranchPrim(center, stalkTop, 1.6, 1.0, const Color(0xFFEF9A9A)));
-    scene.add(SpherePrim(stalkTop, 4, const Color(0xFFF48FB1)));
+    scene.add(BranchPrim(center, stalkTop, 1.6, 1.0, const Color(0xFFFFABCC)));
+    scene.add(SpherePrim(stalkTop, 5, const Color(0xFFFF80AB)));
   }
 }
 
@@ -192,8 +197,9 @@ void _frond(Scene scene, V3 right, V3 planeN, double len, double open,
     final dirPlane =
         (right * math.sin(ang) + const V3(0, 1, 0) * math.cos(ang)).normalized;
     p = p + dirPlane * sl;
+    // My Oasis 고사리 — 싱싱한 에메랄드 초록 줄기
     scene.add(BranchPrim(prev, p, lp(2.4, 1.0, u), lp(2.2, 0.8, u),
-        const Color(0xFF33691E)));
+        const Color(0xFF3A8C52)));
     prev = p;
 
     // 우편(잎조각): 평면 밖으로 양쪽 부채
@@ -204,14 +210,14 @@ void _frond(Scene scene, V3 right, V3 planeN, double len, double open,
           final pdir =
               (planeN * side * 0.85 + dirPlane * 0.45).normalized;
           _leafQuad(scene, p, pdir, pinLen, pinLen * 0.42,
-              i.isEven ? const Color(0xFF4CAF50) : const Color(0xFF388E3C));
+              i.isEven ? const Color(0xFF56C278) : const Color(0xFF3DA05A));
         }
       }
     }
   }
-  // 피들헤드(코일 끝)
+  // 피들헤드(코일 끝) — 밝은 연두
   if (open < 0.97) {
-    scene.add(SpherePrim(p, lp(3.5, 1.0, open), const Color(0xFF7CB342),
-        glossy: false));
+    scene.add(SpherePrim(p, lp(3.5, 1.0, open), const Color(0xFF8ED86A),
+        glossy: true));
   }
 }

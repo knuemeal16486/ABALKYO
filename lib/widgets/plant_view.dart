@@ -1,15 +1,17 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import 'plant3d/engine.dart';
 import 'plant3d/plant_builder.dart';
 
-/// 식물을 실제 3D로 렌더링. 가로 드래그로 360° 회전(yaw), 두 번 탭하면 정면 복귀.
-/// 3D 씬(가지·잎 모델 좌표)은 성장도/시드/종류가 바뀔 때만 재생성하고,
-/// 매 프레임에는 카메라 회전·바람·투영만 적용해 최적화한다.
+/// 식물 3D 뷰어 — My Oasis 스타일 힐링 분위기
+/// · 가로 드래그 360° 회전, 두 번 탭으로 정면 복귀
+/// · ClipRect으로 다른 UI 침범 방지
+/// · 하단 아이소메트릭 그라운드 글로우 + 배경 방사광
 class PlantView extends StatefulWidget {
   final PlantType type;
-  final int growthLevel; // 0~100
+  final int growthLevel;
   final int seed;
   const PlantView({
     super.key,
@@ -67,16 +69,19 @@ class _PlantViewState extends State<PlantView>
   @override
   Widget build(BuildContext context) {
     final scene = _ensureScene();
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: (d) =>
-          setState(() => _yaw += d.delta.dx * 0.012),
-      onDoubleTap: () => setState(() => _yaw = 0),
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, _) => CustomPaint(
-          painter: _ScenePainter(scene, _yaw, _ctrl.value),
-          size: Size.infinite,
+    // ClipRect: 식물이 다른 UI 영역을 절대 침범하지 않음
+    return ClipRect(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (d) =>
+            setState(() => _yaw += d.delta.dx * 0.012),
+        onDoubleTap: () => setState(() => _yaw = 0),
+        child: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (_, _) => CustomPaint(
+            painter: _ScenePainter(scene, _yaw, _ctrl.value),
+            size: Size.infinite,
+          ),
         ),
       ),
     );
@@ -86,20 +91,63 @@ class _PlantViewState extends State<PlantView>
 class _ScenePainter extends CustomPainter {
   final Scene scene;
   final double yaw;
-  final double windPhase; // 0~1
+  final double windPhase;
   _ScenePainter(this.scene, this.yaw, this.windPhase);
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 식물 영역 높이에 맞춰 균일 스케일 (작은 영역에서도 잘리지 않게)
     final fit = (size.height / 580).clamp(0.45, 2.0);
+    final cx = size.width / 2;
+    // 화분 접지점 Y — 아래에 충분한 여백 확보
+    final groundY = size.height - 88 * fit;
+
+    // ── 1. 배경 방사 환경광 (My Oasis 스타일 소프트 백라이트) ──────────────
+    canvas.drawCircle(
+      Offset(cx, groundY - 60 * fit),
+      160 * fit,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          Offset(cx, groundY - 60 * fit),
+          160 * fit,
+          [
+            const Color(0x18FFFFFF),
+            const Color(0x00FFFFFF),
+          ],
+        ),
+    );
+
+    // ── 2. 바닥 그림자/글로우 타원 (My Oasis 아일랜드 그림자) ───────────────
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx, groundY + 22 * fit),
+        width: 200 * fit,
+        height: 28 * fit,
+      ),
+      Paint()
+        ..color = const Color(0x28000000)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 18 * fit),
+    );
+
+    // 아일랜드 하이라이트 (바닥 반사광)
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(cx, groundY + 16 * fit),
+        width: 150 * fit,
+        height: 14 * fit,
+      ),
+      Paint()
+        ..color = const Color(0x14FFFFFF)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 * fit),
+    );
+
+    // ── 3. 3D 식물 씬 렌더링 ────────────────────────────────────────────────
     final cam = Cam(
       yaw: yaw,
       pitch: -0.14,
       focal: 900 * fit,
       camDist: 900,
-      cx: size.width / 2,
-      cy: size.height - 80 * fit,
+      cx: cx,
+      cy: groundY,
       windT: windPhase * math.pi * 2,
       windAmp: 4.5,
       refH: 230,

@@ -90,21 +90,45 @@ class _PlantTab extends StatelessWidget {
         if (isRaining)
           Positioned.fill(child: IgnorePointer(child: _RainLayer())),
 
-        // 4. 하단 그라운드 그라데이션
+        // 4. 하단 그라운드 그라데이션 (My Oasis 스타일 풍부한 바닥)
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
           child: Container(
-            height: 140,
+            height: 180,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  sky.colors.last.withValues(alpha: 0.4)
+                  sky.colors.last.withValues(alpha: 0.25),
+                  sky.colors.last.withValues(alpha: 0.55),
                 ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+        ),
+
+        // 4b. My Oasis 스타일 잔디/바닥 플랫폼 반사광
+        Positioned(
+          bottom: 155,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              width: 280,
+              height: 30,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(100),
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.10),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
@@ -170,19 +194,27 @@ class _PlantTab extends StatelessWidget {
                   child: Container(
                     key: ValueKey(plant.currentStageInfo.id),
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white.withValues(alpha: 0.38),
+                      borderRadius: BorderRadius.circular(24),
                       border:
-                          Border.all(color: Colors.white.withValues(alpha: 0.6)),
+                          Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.20),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ],
                     ),
                     child: Text(
                       '${plant.species.emoji}  ${plant.currentStageInfo.name}  ·  ${plant.growthLevel}%',
                       style: const TextStyle(
                           color: AppTheme.textDark,
                           fontSize: 13,
-                          fontWeight: FontWeight.w600),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3),
                     ),
                   ),
                 ),
@@ -380,16 +412,16 @@ class _GrowthBar extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: level / 100.0),
               duration: const Duration(milliseconds: 800),
               curve: Curves.easeOutCubic,
               builder: (_, v, _) => LinearProgressIndicator(
                 value: v,
-                minHeight: 8,
-                backgroundColor: Colors.white.withValues(alpha: 0.18),
-                valueColor: const AlwaysStoppedAnimation(AppTheme.softMoss),
+                minHeight: 10,
+                backgroundColor: Colors.white.withValues(alpha: 0.15),
+                valueColor: const AlwaysStoppedAnimation(Color(0xFF7ECBA9)),
               ),
             ),
           ),

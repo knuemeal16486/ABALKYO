@@ -45,13 +45,14 @@ class _AppleBuilder {
     _grow(const V3(0, 2, 0), const V3(0, 1, 0), 226, 15, 0, 0.0);
   }
 
+  // My Oasis 스타일 — 따뜻한 나무껍질 톤
   Color _bark(int d) => Color.lerp(
-      const Color(0xFF5D4037), const Color(0xFF8D6E63), (d / maxDepth).clamp(0, 1))!;
+      const Color(0xFF7B5544), const Color(0xFFA07855), (d / maxDepth).clamp(0, 1))!;
 
   Color _leafTint() {
-    final t = (rng.nextDouble() - 0.5) * 0.18;
+    final t = (rng.nextDouble() - 0.5) * 0.20;
     return Color.lerp(sn.leafColor,
-        t < 0 ? const Color(0xFF1B5E20) : const Color(0xFFC5E1A5), t.abs())!;
+        t < 0 ? const Color(0xFF2E7D52) : const Color(0xFFB5EAB5), t.abs())!;
   }
 
   void _grow(V3 pos, V3 dir, double len, double rad, int depth, double tBirth) {
@@ -124,13 +125,13 @@ class _AppleBuilder {
     if (fa > 0.15 && rng.nextDouble() < 0.6) {
       _blossom(pos + dir * 4, fa);
     }
-    // 결실
+    // 결실 — My Oasis 스타일 루비레드 사과 (더 통통하고 윤기나게)
     final ra = sn.fruit > 0.2 ? sstep(0.8, 0.96, g) * sn.fruit : 0.0;
     if (ra > 0.2 && rng.nextDouble() < 0.5) {
       final ripe = sstep(0.86, 1.0, g);
-      final col = Color.lerp(const Color(0xFF9CCC65), const Color(0xFFD32F2F),
+      final col = Color.lerp(const Color(0xFF88CC66), const Color(0xFFE53935),
           ripe.clamp(0.0, 1.0))!;
-      scene.add(SpherePrim(pos + dir * lp(2, 6, ra), lp(2, 9, ra), col));
+      scene.add(SpherePrim(pos + dir * lp(2, 6, ra), lp(2.5, 10, ra), col));
     }
   }
 
@@ -147,23 +148,26 @@ class _AppleBuilder {
         veinColor: const Color(0xFF2E7D32)));
   }
 
+  // 어비스리움/My Oasis 스타일 꽃 — 파스텔 핑크 꽃잎 + 황금 꽃술
   void _blossom(V3 center, double a) {
     final w = const V3(0, 1, 0).anyPerp;
     final n2 = const V3(0, 1, 0);
-    final sz = lp(4, 9, a);
+    final sz = lp(4, 10, a);
     for (int i = 0; i < 5; i++) {
       final ang = i * 2 * math.pi / 5;
       final d = w.rotateAxis(n2, ang);
       final pw = d.anyPerp;
       final tip = center + d * sz;
+      // 꽃잎: 바깥쪽으로 갈수록 더 밝아지는 핑크
       scene.add(QuadPrim([
         center,
-        center + d * (sz * 0.5) + pw * (sz * 0.28),
+        center + d * (sz * 0.5) + pw * (sz * 0.32),
         tip,
-        center + d * (sz * 0.5) - pw * (sz * 0.28),
-      ], n2, Color(0xFFFFF1F5).withValues(alpha: 0.95)));
+        center + d * (sz * 0.5) - pw * (sz * 0.32),
+      ], n2, const Color(0xFFFFC8DB)));
     }
-    scene.add(SpherePrim(center, sz * 0.34, const Color(0xFFFFD600),
-        glossy: false));
+    // 꽃술 중앙 — 황금 글로우
+    scene.add(SpherePrim(center, sz * 0.38, const Color(0xFFFFE040),
+        glossy: true));
   }
 }

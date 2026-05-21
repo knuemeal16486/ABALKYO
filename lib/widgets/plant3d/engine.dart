@@ -108,7 +108,7 @@ class Cam {
   /// 법선을 뷰 공간으로 (이동/바람 무시, 회전만)
   V3 rotN(V3 n) => n.rotateY(yaw).rotateX(pitch);
 
-  double lambert(V3 modelNormal, {double ambient = 0.45}) {
+  double lambert(V3 modelNormal, {double ambient = 0.60}) {
     final n = rotN(modelNormal);
     final d = n.dot(light).abs(); // 양면 조명
     return (ambient + (1 - ambient) * d).clamp(0.0, 1.0);
@@ -252,22 +252,41 @@ class SpherePrim extends Prim {
   void draw(Canvas c) {
     if (_r < 0.5) return;
     if (glossy) {
-      final hl = _c + Offset(-_r * 0.3, -_r * 0.3);
+      // 어비스리움 스타일 외부 글로우 후광
+      c.drawCircle(
+        _c,
+        _r * 2.2,
+        Paint()
+          ..color = color.withValues(alpha: 0.18)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 1.2),
+      );
+      // 메인 구체 — 부드러운 방사형 그라데이션
+      final hl = _c + Offset(-_r * 0.28, -_r * 0.32);
       c.drawCircle(
         _c,
         _r,
         Paint()
-          ..shader = ui.Gradient.radial(hl, _r * 1.4, [
-            _shade(color, 1.2),
+          ..shader = ui.Gradient.radial(hl, _r * 1.3, [
+            _shade(color, 1.35),
             color,
-            _shade(color, 0.6),
-          ], [
-            0.0,
-            0.5,
-            1.0
-          ]),
+            _shade(color, 0.62),
+          ], [0.0, 0.42, 1.0]),
+      );
+      // 스페큘러 하이라이트 (반짝이는 점)
+      c.drawCircle(
+        _c + Offset(-_r * 0.24, -_r * 0.27),
+        _r * 0.20,
+        Paint()..color = const Color(0xAAFFFFFF),
       );
     } else {
+      // 무광 구체에도 약한 글로우
+      c.drawCircle(
+        _c,
+        _r * 1.6,
+        Paint()
+          ..color = color.withValues(alpha: 0.12)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 0.8),
+      );
       c.drawCircle(_c, _r, Paint()..color = color);
     }
   }
