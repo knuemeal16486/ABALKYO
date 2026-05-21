@@ -47,13 +47,11 @@ class V3 {
     return V3(x, c * y - s * z, s * y + c * z);
   }
 
-  /// 이 방향에 수직인 단위벡터 하나
   V3 get anyPerp {
     final up = y.abs() > 0.9 ? const V3(1, 0, 0) : const V3(0, 1, 0);
     return cross(up).normalized;
   }
 
-  /// 임의 축(k, 단위벡터) 둘레로 angle 만큼 회전 (Rodrigues)
   V3 rotateAxis(V3 k, double angle) {
     final c = math.cos(angle), s = math.sin(angle);
     final kv = k.cross(this);
@@ -66,15 +64,13 @@ class V3 {
   }
 }
 
-/// 한 점의 투영 결과
 class PV {
-  final Offset s; // 화면 좌표
-  final double z; // 뷰 공간 깊이(클수록 카메라에 가까움)
-  final double scale; // 원근 배율
+  final Offset s;
+  final double z;
+  final double scale;
   const PV(this.s, this.z, this.scale);
 }
 
-/// 카메라 + 광원 + 바람. 매 프레임 새로 만든다.
 class Cam {
   final double yaw, pitch, focal, cx, cy, camDist;
   final double windT, windAmp, refH;
@@ -85,8 +81,8 @@ class Cam {
     required this.pitch,
     required this.cx,
     required this.cy,
-    this.focal = 900,
-    this.camDist = 900,
+    this.focal = 1000,
+    this.camDist = 800,
     this.windT = 0,
     this.windAmp = 0,
     this.refH = 300,
@@ -94,7 +90,6 @@ class Cam {
   }) : light = light ?? const V3(-0.45, 0.78, 0.45).normalized;
 
   PV project(V3 p) {
-    // 바람: 높이에 비례해 윗부분이 더 흔들림
     final hy = (p.y / refH).clamp(0.0, 1.6);
     final wx = math.sin(windT * 1.1 + p.y * 0.012) * windAmp * hy;
     final wz = math.cos(windT * 0.9 + p.y * 0.016) * windAmp * 0.6 * hy;
@@ -105,31 +100,42 @@ class Cam {
     return PV(Offset(cx + v.x * s, cy - v.y * s), v.z, s);
   }
 
-  /// 법선을 뷰 공간으로 (이동/바람 무시, 회전만)
   V3 rotN(V3 n) => n.rotateY(yaw).rotateX(pitch);
 
   double lambert(V3 modelNormal, {double ambient = 0.60}) {
     final n = rotN(modelNormal);
-    final d = n.dot(light).abs(); // 양면 조명
+    final d = n.dot(light).abs();
     return (ambient + (1 - ambient) * d).clamp(0.0, 1.0);
   }
 }
 
 // ── 프리미티브 ───────────────────────────────────────────────────────────────
 abstract class Prim {
-  double depth = 0; // 정렬용 (뷰 공간 z 평균)
+  double depth = 0;
   void project(Cam cam);
   void draw(Canvas c);
 }
 
-Color _shade(Color base, double l) => Color.fromARGB(
+/// 어두워질 때는 단순 스케일, 밝아질 때는 흰색 쪽으로 lerp → 채도 유지
+Color _shade(Color base, double l) {
+  if (l >= 1.0) {
+    final t = ((l - 1.0) * 0.55).clamp(0.0, 1.0);
+    return Color.fromARGB(
       (base.a * 255).round(),
-      (base.r * 255 * l).round().clamp(0, 255),
-      (base.g * 255 * l).round().clamp(0, 255),
-      (base.b * 255 * l).round().clamp(0, 255),
+      ((base.r * 255 + (255 - base.r * 255) * t)).round().clamp(0, 255),
+      ((base.g * 255 + (255 - base.g * 255) * t)).round().clamp(0, 255),
+      ((base.b * 255 + (255 - base.b * 255) * t)).round().clamp(0, 255),
     );
+  }
+  return Color.fromARGB(
+    (base.a * 255).round(),
+    (base.r * 255 * l).round().clamp(0, 255),
+    (base.g * 255 * l).round().clamp(0, 255),
+    (base.b * 255 * l).round().clamp(0, 255),
+  );
+}
 
-/// 가지: 끝이 가늘어지는 리본 + 원통형(좌→우 명암) 음영
+/// 가지: 베지어 곡선 윤곽 + 5-stop 원통형 그라데이션 + 스페큘러 하이라이트
 class BranchPrim extends Prim {
   final V3 a, b;
   final double ra, rb;
@@ -138,7 +144,7 @@ class BranchPrim extends Prim {
 
   late Offset _sa, _sb, _perp;
   late double _ras, _rbs;
-  late Color _light, _dark;
+  late Color _col; // 깊이 기반 기본 색
 
   @override
   void project(Cam cam) {
@@ -152,38 +158,90 @@ class BranchPrim extends Prim {
     final len = dir.distance;
     dir = len < 1e-3 ? const Offset(0, -1) : dir / len;
     _perp = Offset(-dir.dy, dir.dx);
-    // 깊이로 약간의 명암 변화 + 원통 음영
-    final dl = (0.5 + depth / 600).clamp(0.35, 1.0);
-    _light = _shade(color, (dl + 0.25).clamp(0.0, 1.0));
-    _dark = _shade(color, (dl - 0.28).clamp(0.0, 1.0));
+    final dl = (0.50 + depth / 650).clamp(0.38, 1.0);
+    _col = _shade(color, dl);
   }
 
   @override
   void draw(Canvas c) {
-    final lp = _sa + _perp * _ras;
-    final lp2 = _sb + _perp * _rbs;
-    final rp = _sb - _perp * _rbs;
-    final rp2 = _sa - _perp * _ras;
+    if (_ras < 0.22 && _rbs < 0.22) return;
+
+    final dir = _sb - _sa;
+    final len = dir.distance;
+    if (len < 0.3) return;
+    final nd = dir / len;
+
+    // 베지어 제어점 → 유기적 테이퍼 곡선
+    final cp1 = _sa + nd * (len * 0.33);
+    final cp2 = _sa + nd * (len * 0.67);
+
+    // 왼쪽 곡선 → 오른쪽 곡선 → 닫기
     final path = Path()
-      ..moveTo(lp.dx, lp.dy)
-      ..lineTo(lp2.dx, lp2.dy)
-      ..lineTo(rp.dx, rp.dy)
-      ..lineTo(rp2.dx, rp2.dy)
+      ..moveTo(_sa.dx + _perp.dx * _ras, _sa.dy + _perp.dy * _ras)
+      ..cubicTo(
+        cp1.dx + _perp.dx * _ras, cp1.dy + _perp.dy * _ras,
+        cp2.dx + _perp.dx * _rbs, cp2.dy + _perp.dy * _rbs,
+        _sb.dx + _perp.dx * _rbs, _sb.dy + _perp.dy * _rbs,
+      )
+      ..lineTo(_sb.dx - _perp.dx * _rbs, _sb.dy - _perp.dy * _rbs)
+      ..cubicTo(
+        cp2.dx - _perp.dx * _rbs, cp2.dy - _perp.dy * _rbs,
+        cp1.dx - _perp.dx * _ras, cp1.dy - _perp.dy * _ras,
+        _sa.dx - _perp.dx * _ras, _sa.dy - _perp.dy * _ras,
+      )
       ..close();
-    final mid = (_sa + _sb) * 0.5;
-    final paint = Paint()
-      ..shader = ui.Gradient.linear(
-        mid + _perp * (math.max(_ras, _rbs)),
-        mid - _perp * (math.max(_ras, _rbs)),
-        [_light, _dark],
+
+    final maxR = math.max(_ras, _rbs);
+    final mid = Offset((_sa.dx + _sb.dx) * 0.5, (_sa.dy + _sb.dy) * 0.5);
+    final pLen = maxR * 1.18;
+
+    // 5-stop 원통형 그라데이션: 그림자 가장자리 → 중간 → 하이라이트 → 중간 → 그림자
+    c.drawPath(
+      path,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(mid.dx + _perp.dx * pLen, mid.dy + _perp.dy * pLen),
+          Offset(mid.dx - _perp.dx * pLen, mid.dy - _perp.dy * pLen),
+          [
+            _shade(_col, 0.28),
+            _shade(_col, 0.65),
+            _shade(_col, 1.50),
+            _shade(_col, 0.68),
+            _shade(_col, 0.30),
+          ],
+          [0.0, 0.18, 0.40, 0.70, 1.0],
+        ),
+    );
+
+    // 스페큘러 하이라이트 선 (두꺼운 가지에서만)
+    if (maxR > 1.6) {
+      c.drawPath(
+        Path()
+          ..moveTo(
+            _sa.dx + _perp.dx * _ras * 0.08,
+            _sa.dy + _perp.dy * _ras * 0.08,
+          )
+          ..cubicTo(
+            cp1.dx + _perp.dx * _ras * 0.10,
+            cp1.dy + _perp.dy * _ras * 0.10,
+            cp2.dx + _perp.dx * _rbs * 0.13,
+            cp2.dy + _perp.dy * _rbs * 0.13,
+            _sb.dx + _perp.dx * _rbs * 0.13,
+            _sb.dy + _perp.dy * _rbs * 0.13,
+          ),
+        Paint()
+          ..color = const Color(0x20FFFFFF)
+          ..strokeWidth = maxR * 0.26
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
       );
-    c.drawPath(path, paint);
+    }
   }
 }
 
-/// 평면 폴리곤(잎·꽃잎·화분면). 법선으로 람베르트 음영, 양면.
+/// 잎·꽃잎·화분 면 — 4점: 베지어 타원형 잎, 3점: 직선 삼각형
 class QuadPrim extends Prim {
-  final List<V3> v; // 3~4점
+  final List<V3> v;
   final V3 normal;
   final Color color;
   final Color? veinColor;
@@ -212,24 +270,70 @@ class QuadPrim extends Prim {
 
   @override
   void draw(Canvas c) {
-    final path = Path()..moveTo(_s[0].dx, _s[0].dy);
-    for (int i = 1; i < _s.length; i++) {
-      path.lineTo(_s[i].dx, _s[i].dy);
-    }
-    path.close();
-    c.drawPath(path, Paint()..color = _c);
-    if (_veinA != null) {
-      c.drawLine(
+    final path = _bezierPath();
+
+    if (veinColor != null && _s.length >= 4) {
+      // 잎: 베이스→팁 방향 그라데이션
+      final base = _s[0];
+      final tip = _s[2];
+      c.drawPath(
+        path,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            base,
+            tip,
+            [_shade(_c, 0.72), _c, _shade(_c, 1.14)],
+            [0.0, 0.45, 1.0],
+          ),
+      );
+      if (_veinA != null) {
+        c.drawLine(
           _veinA!,
           _veinB!,
           Paint()
-            ..color = veinColor!.withValues(alpha: 0.5)
-            ..strokeWidth = 0.8);
+            ..color = veinColor!.withValues(alpha: 0.50)
+            ..strokeWidth = 0.90
+            ..strokeCap = StrokeCap.round,
+        );
+      }
+    } else {
+      c.drawPath(path, Paint()..color = _c);
+      if (_veinA != null) {
+        c.drawLine(
+          _veinA!,
+          _veinB!,
+          Paint()
+            ..color = veinColor!.withValues(alpha: 0.50)
+            ..strokeWidth = 0.90
+            ..strokeCap = StrokeCap.round,
+        );
+      }
     }
+  }
+
+  Path _bezierPath() {
+    if (_s.length != 4) {
+      // 3점 삼각형 (흙, 꽃 원반 등) → 직선
+      final path = Path()..moveTo(_s[0].dx, _s[0].dy);
+      for (int i = 1; i < _s.length; i++) {
+        path.lineTo(_s[i].dx, _s[i].dy);
+      }
+      return path..close();
+    }
+    // 4점 다이아몬드 → 이차 베지어 타원형 잎
+    final base = _s[0]; // 줄기 부착점
+    final lft  = _s[1]; // 왼쪽 폭 최대점
+    final tip  = _s[2]; // 잎끝
+    final rgt  = _s[3]; // 오른쪽 폭 최대점
+    return Path()
+      ..moveTo(base.dx, base.dy)
+      ..quadraticBezierTo(lft.dx, lft.dy, tip.dx, tip.dy)
+      ..quadraticBezierTo(rgt.dx, rgt.dy, base.dx, base.dy)
+      ..close();
   }
 }
 
-/// 구체 느낌의 빌보드(열매·꽃 중심). 위치는 3D, 크기는 원근 배율.
+/// 구체 느낌의 빌보드(열매·꽃 중심). 방사형 그라데이션 + 스페큘러
 class SpherePrim extends Prim {
   final V3 center;
   final double radius;
@@ -252,40 +356,36 @@ class SpherePrim extends Prim {
   void draw(Canvas c) {
     if (_r < 0.5) return;
     if (glossy) {
-      // 어비스리움 스타일 외부 글로우 후광
       c.drawCircle(
         _c,
-        _r * 2.2,
+        _r * 2.4,
         Paint()
-          ..color = color.withValues(alpha: 0.18)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 1.2),
+          ..color = color.withValues(alpha: 0.16)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 1.4),
       );
-      // 메인 구체 — 부드러운 방사형 그라데이션
-      final hl = _c + Offset(-_r * 0.28, -_r * 0.32);
+      final hl = _c + Offset(-_r * 0.30, -_r * 0.35);
       c.drawCircle(
         _c,
         _r,
         Paint()
-          ..shader = ui.Gradient.radial(hl, _r * 1.3, [
-            _shade(color, 1.35),
+          ..shader = ui.Gradient.radial(hl, _r * 1.4, [
+            _shade(color, 1.55),
             color,
-            _shade(color, 0.62),
-          ], [0.0, 0.42, 1.0]),
+            _shade(color, 0.55),
+          ], [0.0, 0.40, 1.0]),
       );
-      // 스페큘러 하이라이트 (반짝이는 점)
       c.drawCircle(
-        _c + Offset(-_r * 0.24, -_r * 0.27),
-        _r * 0.20,
+        _c + Offset(-_r * 0.26, -_r * 0.30),
+        _r * 0.22,
         Paint()..color = const Color(0xAAFFFFFF),
       );
     } else {
-      // 무광 구체에도 약한 글로우
       c.drawCircle(
         _c,
-        _r * 1.6,
+        _r * 1.7,
         Paint()
           ..color = color.withValues(alpha: 0.12)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 0.8),
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, _r * 0.9),
       );
       c.drawCircle(_c, _r, Paint()..color = color);
     }
@@ -301,7 +401,7 @@ class Scene {
     for (final p in prims) {
       p.project(cam);
     }
-    prims.sort((a, b) => a.depth.compareTo(b.depth)); // 먼 것부터
+    prims.sort((a, b) => a.depth.compareTo(b.depth));
     for (final p in prims) {
       p.draw(canvas);
     }
