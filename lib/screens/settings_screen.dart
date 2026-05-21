@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../models/achievement.dart';
+import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
+import 'achievements_screen.dart';
+import 'stats_screen.dart';
 import 'teacher_report_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -60,6 +64,12 @@ class SettingsScreen extends StatelessWidget {
                       _ApiKeyTile(hasKey: provider.aiEnabled),
                       const SizedBox(height: 12),
                       _ReportTile(enabled: provider.aiEnabled),
+                      const SizedBox(height: 24),
+
+                      _SectionTitle('감정 기록 & 성취'),
+                      _StatsTile(),
+                      const SizedBox(height: 12),
+                      _AchievementsTile(provider: provider),
                       const SizedBox(height: 24),
 
                       _SectionTitle('정원 도감 (다 키운 식물)'),
@@ -269,6 +279,128 @@ class _ApiKeyTile extends StatelessWidget {
   }
 }
 
+class _StatsTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const StatsScreen())),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: _cardDeco(),
+        child: Row(
+          children: [
+            const Text('📊', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('감정 통계',
+                      style: TextStyle(
+                          color: AppTheme.dawnGlow,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                  SizedBox(height: 2),
+                  Text('무드 히트맵, 분포 차트, 연속 기록',
+                      style:
+                          TextStyle(color: AppTheme.textSubtle, fontSize: 12)),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppTheme.textSubtle, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AchievementsTile extends StatelessWidget {
+  final AppProvider provider;
+  const _AchievementsTile({required this.provider});
+
+  int _unlockedCount() {
+    int count = 0;
+    for (final a in kAchievements) {
+      final done = switch (a.id) {
+        'first_diary' => provider.totalEntries >= 1,
+        'streak_3' => provider.streakDays >= 3,
+        'streak_7' => provider.streakDays >= 7,
+        'total_10' => provider.totalEntries >= 10,
+        'total_30' => provider.totalEntries >= 30,
+        'first_harvest' => provider.collection.isNotEmpty,
+        'two_harvest' => provider.collection.length >= 2,
+        'all_emotions' =>
+          provider.diaryEntries.map((e) => e.emotion).toSet().length >= 8,
+        'comforting_5' =>
+          provider.diaryEntries
+              .where((e) => Emotions.isComforting(e.emotion))
+              .length >=
+          5,
+        'photo_diary' =>
+          provider.diaryEntries.any((e) => e.imageUrl != null),
+        _ => false,
+      };
+      if (done) count++;
+    }
+    return count;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final unlocked = _unlockedCount();
+    final total = kAchievements.length;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const AchievementsScreen())),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: _cardDeco(),
+        child: Row(
+          children: [
+            const Text('🏅', style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('나의 배지',
+                      style: TextStyle(
+                          color: AppTheme.dawnGlow,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: unlocked / total,
+                      minHeight: 5,
+                      backgroundColor:
+                          Colors.white.withValues(alpha: 0.08),
+                      valueColor: const AlwaysStoppedAnimation(
+                          AppTheme.softMoss),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text('$unlocked / $total 획득',
+                      style: const TextStyle(
+                          color: AppTheme.textSubtle, fontSize: 11)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppTheme.textSubtle, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ReportTile extends StatelessWidget {
   final bool enabled;
   const _ReportTile({required this.enabled});
@@ -331,43 +463,90 @@ class _CollectionCard extends StatelessWidget {
   final AppProvider provider;
   final DateFormat df;
   const _CollectionCard({required this.provider, required this.df});
+
   @override
   Widget build(BuildContext context) {
     final items = provider.collection;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: _cardDeco(),
-      child: items.isEmpty
-          ? Row(
-              children: [
-                const Text('🌱', style: TextStyle(fontSize: 22)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('아직 다 키운 식물이 없어요.\n매일 기록하며 첫 식물을 키워보세요!',
-                      style: TextStyle(
-                          color: AppTheme.textSubtle,
-                          fontSize: 13,
-                          height: 1.5)),
-                ),
-              ],
-            )
-          : Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: items
-                  .map((h) => Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(h.species.emoji,
-                              style: const TextStyle(fontSize: 34)),
-                          const SizedBox(height: 4),
-                          Text(df.format(h.harvestedAt),
-                              style: const TextStyle(
-                                  color: AppTheme.textSubtle, fontSize: 11)),
-                        ],
-                      ))
-                  .toList(),
+    if (items.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: _cardDeco(),
+        child: Row(
+          children: [
+            const Text('🌱', style: TextStyle(fontSize: 22)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                '아직 다 키운 식물이 없어요.\n매일 기록하며 첫 식물을 키워보세요!',
+                style: TextStyle(
+                    color: AppTheme.textSubtle, fontSize: 13, height: 1.6),
+              ),
             ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: items.asMap().entries.map((entry) {
+        final i = entry.key;
+        final h = entry.value;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.07),
+                Colors.white.withValues(alpha: 0.03),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+                color: AppTheme.softMoss.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppTheme.softMoss.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(h.species.emoji,
+                      style: const TextStyle(fontSize: 28)),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(h.species.name,
+                        style: const TextStyle(
+                            color: AppTheme.dawnGlow,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${df.format(h.harvestedAt)} 수확',
+                      style: const TextStyle(
+                          color: AppTheme.textSubtle, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Text('#${i + 1}',
+                  style: TextStyle(
+                      color: AppTheme.softMoss.withValues(alpha: 0.7),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }
