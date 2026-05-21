@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
+import 'creature_overlay.dart';
 import 'plant3d/engine.dart';
 import 'plant3d/plant_builder.dart';
 
@@ -115,23 +116,32 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return ClipRect(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragUpdate: (d) =>
-            setState(() => _yaw += d.delta.dx * 0.012),
-        onDoubleTap: () => setState(() => _yaw = 0),
-        // _windCtrl가 60fps로 tick → _currentG(= _growCtrl 값 포함)도 매 프레임 갱신
-        child: AnimatedBuilder(
-          animation: _windCtrl,
-          builder: (_, _) {
-            final g = _currentG;
-            final scene = _ensureScene(g);
-            return CustomPaint(
-              painter: _ScenePainter(scene, _yaw, _windCtrl.value),
-              size: Size.infinite,
-            );
-          },
-        ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 3D 식물 + 제스처
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragUpdate: (d) =>
+                setState(() => _yaw += d.delta.dx * 0.012),
+            onDoubleTap: () => setState(() => _yaw = 0),
+            child: AnimatedBuilder(
+              animation: _windCtrl,
+              builder: (_, _) {
+                final g = _currentG;
+                final scene = _ensureScene(g);
+                return CustomPaint(
+                  painter: _ScenePainter(scene, _yaw, _windCtrl.value),
+                  size: Size.infinite,
+                );
+              },
+            ),
+          ),
+          // 생물 오버레이 (터치 무시)
+          IgnorePointer(
+            child: CreatureOverlay(growthLevel: widget.growthLevel),
+          ),
+        ],
       ),
     );
   }
