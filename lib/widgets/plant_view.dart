@@ -5,6 +5,7 @@ import '../models/app_models.dart';
 import 'creature_overlay.dart';
 import 'plant3d/engine.dart';
 import 'plant3d/plant_builder.dart';
+import 'plant_background.dart';
 
 /// 식물 3D 뷰어
 ///  · 핀치 줌 (0.5× ~ 3.0×) — 두 손가락 벌리기/오므리기
@@ -110,6 +111,14 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          // 성장 단계별 배경
+          AnimatedBuilder(
+            animation: _windCtrl,
+            builder: (_, _) => PlantBackground(
+              growthLevel: widget.growthLevel,
+              windPhase: _windCtrl.value,
+            ),
+          ),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onScaleStart: (_) => _zoomBase = _zoom,
