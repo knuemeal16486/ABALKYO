@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
+import 'creature_overlay.dart';
 import 'plant3d/engine.dart';
 import 'plant3d/plant_builder.dart';
 
@@ -67,17 +68,27 @@ class _PlantViewState extends State<PlantView>
   @override
   Widget build(BuildContext context) {
     final scene = _ensureScene();
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: (d) =>
-          setState(() => _yaw += d.delta.dx * 0.012),
-      onDoubleTap: () => setState(() => _yaw = 0),
-      child: AnimatedBuilder(
-        animation: _ctrl,
-        builder: (_, _) => CustomPaint(
-          painter: _ScenePainter(scene, _yaw, _ctrl.value),
-          size: Size.infinite,
-        ),
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragUpdate: (d) =>
+                setState(() => _yaw += d.delta.dx * 0.012),
+            onDoubleTap: () => setState(() => _yaw = 0),
+            child: AnimatedBuilder(
+              animation: _ctrl,
+              builder: (_, _) => CustomPaint(
+                painter: _ScenePainter(scene, _yaw, _ctrl.value),
+                size: Size.infinite,
+              ),
+            ),
+          ),
+          IgnorePointer(
+            child: CreatureOverlay(growthLevel: widget.growthLevel),
+          ),
+        ],
       ),
     );
   }
