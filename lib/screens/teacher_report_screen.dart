@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 
 /// 교사용: 아동의 최근 감정 일기를 AI로 분석해 정서 리포트 + 감정 패턴을 보여준다.
 class TeacherReportScreen extends StatefulWidget {
@@ -50,23 +51,12 @@ class _TeacherReportScreenState extends State<TeacherReportScreen> {
         provider.studentName.isEmpty ? '학생' : provider.studentName;
 
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF0D1F14), Color(0xFF1B3A2D)],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding:
+      body: WarmBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Row(
                     children: [
@@ -110,8 +100,7 @@ class _TeacherReportScreenState extends State<TeacherReportScreen> {
               ],
             ),
           ),
-        ],
-      ),
+        ),
     );
   }
 

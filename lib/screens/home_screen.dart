@@ -13,6 +13,7 @@ import '../widgets/seed_picker.dart';
 import 'diary_screen.dart';
 import 'calendar_screen.dart';
 import 'settings_screen.dart';
+import 'stats_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -90,21 +91,45 @@ class _PlantTab extends StatelessWidget {
         if (isRaining)
           Positioned.fill(child: IgnorePointer(child: _RainLayer())),
 
-        // 4. 하단 그라운드 그라데이션
+        // 4. 하단 그라운드 그라데이션 (My Oasis 스타일 풍부한 바닥)
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
           child: Container(
-            height: 140,
+            height: 180,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  sky.colors.last.withValues(alpha: 0.4)
+                  sky.colors.last.withValues(alpha: 0.25),
+                  sky.colors.last.withValues(alpha: 0.55),
                 ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+        ),
+
+        // 4b. My Oasis 스타일 잔디/바닥 플랫폼 반사광
+        Positioned(
+          bottom: 155,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Container(
+              width: 280,
+              height: 30,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(100),
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.10),
+                    Colors.transparent,
+                  ],
+                ),
               ),
             ),
           ),
@@ -145,6 +170,14 @@ class _PlantTab extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     _IconBtn(
+                        icon: Icons.bar_chart_rounded,
+                        color: AppTheme.textDark,
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const StatsScreen()))),
+                    const SizedBox(width: 8),
+                    _IconBtn(
                         icon: Icons.calendar_month_rounded,
                         color: AppTheme.textDark,
                         onTap: () => Navigator.push(
@@ -170,30 +203,48 @@ class _PlantTab extends StatelessWidget {
                   child: Container(
                     key: ValueKey(plant.currentStageInfo.id),
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white.withValues(alpha: 0.38),
+                      borderRadius: BorderRadius.circular(24),
                       border:
-                          Border.all(color: Colors.white.withValues(alpha: 0.6)),
+                          Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.20),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ],
                     ),
                     child: Text(
                       '${plant.species.emoji}  ${plant.currentStageInfo.name}  ·  ${plant.growthLevel}%',
                       style: const TextStyle(
                           color: AppTheme.textDark,
                           fontSize: 13,
-                          fontWeight: FontWeight.w600),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3),
                     ),
                   ),
                 ),
               ),
 
-              // 식물 뷰
-              Expanded(
-                child: PlantView(
-                  type: plant.type,
+              const SizedBox(height: 8),
+
+              // 오늘의 정원 한마디
+              _DailyAffirmation(
                   growthLevel: plant.growthLevel,
-                  seed: plant.seed,
+                  entries: provider.diaryEntries),
+
+              // 식물 뷰 (탭하면 상세 팝업)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showPlantInfoSheet(context, plant, provider),
+                  child: PlantView(
+                    type: plant.type,
+                    growthLevel: plant.growthLevel,
+                    seed: plant.seed,
+                  ),
                 ),
               ),
 
@@ -245,14 +296,14 @@ class _PrimaryButton extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 30),
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.5),
+          color: Colors.white.withValues(alpha: 0.32),
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
           boxShadow: [
             BoxShadow(
-                color: Colors.white.withValues(alpha: 0.3),
-                blurRadius: 16,
-                spreadRadius: 1),
+                color: Colors.white.withValues(alpha: 0.22),
+                blurRadius: 20,
+                spreadRadius: 2),
           ],
         ),
         child: Row(
@@ -357,6 +408,186 @@ void _showHarvestSheet(BuildContext context) {
   );
 }
 
+// ── 오늘의 정원 한마디 ───────────────────────────────────────────────────────
+class _DailyAffirmation extends StatelessWidget {
+  final int growthLevel;
+  final List<EmotionEntry> entries;
+  const _DailyAffirmation(
+      {required this.growthLevel, required this.entries});
+
+  String get _message {
+    // 최근 3개 중 위로 감정이 많으면 응원 메시지 우선
+    final recent = entries.length > 3 ? entries.sublist(entries.length - 3) : entries;
+    final comfortingCount =
+        recent.where((e) => Emotions.isComforting(e.emotion)).length;
+    if (comfortingCount >= 2) {
+      return '힘든 마음도 정원을 자라게 하는 소중한 거름이에요 🌧';
+    }
+    if (growthLevel == 0) return '씨앗을 심었어요. 오늘의 마음을 기록해봐요 🌱';
+    if (growthLevel < 25) return '조금씩 싹이 트고 있어요. 매일 기록이 힘이 돼요 🌿';
+    if (growthLevel < 55) return '식물이 쑥쑥 자라고 있어요! 잘하고 있어요 🌱';
+    if (growthLevel < 80) return '꽃을 피울 준비를 하고 있어요. 거의 다 왔어요 🌸';
+    if (growthLevel < 100) return '수확이 얼마 남지 않았어요! 조금만 더 기록해봐요 🎉';
+    return '다 자랐어요! 새 씨앗을 심을 시간이에요 🌳';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 500),
+        child: Container(
+          key: ValueKey(_message),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+          ),
+          child: Text(
+            _message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                color: AppTheme.textDark, fontSize: 12, height: 1.4),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── 식물 상세 팝업 ───────────────────────────────────────────────────────────
+void _showPlantInfoSheet(
+    BuildContext context, Plant plant, AppProvider provider) {
+  final days =
+      DateTime.now().difference(plant.plantedAt).inDays;
+  final species = plant.species;
+  final stage = plant.currentStageInfo;
+
+  // 다음 단계 찾기
+  final nextStage = species.stages.firstWhere(
+    (s) => s.requiredGrowth > plant.growthLevel,
+    orElse: () => stage,
+  );
+  final toNext = nextStage == stage
+      ? 0
+      : nextStage.requiredGrowth - plant.growthLevel;
+  final entriesNeeded =
+      (toNext / AppProvider.growthPerEntry).ceil();
+
+  // 이 식물이 소화한 일기 수
+  final absorbed = provider.diaryEntries
+      .where((e) => e.date
+          .isAfter(plant.plantedAt.subtract(const Duration(minutes: 1))))
+      .length;
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: AppTheme.deepForest,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+    builder: (_) => Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white24,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(species.emoji,
+              style: const TextStyle(fontSize: 52)),
+          const SizedBox(height: 10),
+          Text(species.name,
+              style: const TextStyle(
+                  color: AppTheme.dawnGlow,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(stage.name,
+              style: const TextStyle(
+                  color: AppTheme.softMoss, fontSize: 14)),
+          const SizedBox(height: 24),
+          _InfoRow(
+              icon: '📅',
+              label: '심은 지',
+              value: days == 0 ? '오늘' : '$days일 째'),
+          const SizedBox(height: 12),
+          _InfoRow(
+              icon: '📔',
+              label: '기록한 일기',
+              value: '$absorbed개'),
+          const SizedBox(height: 12),
+          _InfoRow(
+              icon: '🌱',
+              label: '성장',
+              value: '${plant.growthLevel}%'),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: plant.growthLevel / 100.0),
+              duration: const Duration(milliseconds: 900),
+              curve: Curves.easeOutCubic,
+              builder: (_, v, _) => LinearProgressIndicator(
+                value: v,
+                minHeight: 10,
+                backgroundColor: Colors.white12,
+                valueColor:
+                    const AlwaysStoppedAnimation(Color(0xFF7ECBA9)),
+              ),
+            ),
+          ),
+          if (toNext > 0) ...[
+            const SizedBox(height: 12),
+            Text(
+              '다음 단계 "${nextStage.name}"까지 일기 $entriesNeeded번 더 써요',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: AppTheme.textSubtle, fontSize: 12, height: 1.5),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _InfoRow extends StatelessWidget {
+  final String icon;
+  final String label;
+  final String value;
+  const _InfoRow(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(icon, style: const TextStyle(fontSize: 16)),
+        const SizedBox(width: 10),
+        Text(label,
+            style: const TextStyle(
+                color: AppTheme.textSubtle, fontSize: 14)),
+        const Spacer(),
+        Text(value,
+            style: const TextStyle(
+                color: AppTheme.dawnGlow,
+                fontSize: 14,
+                fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+}
+
 // ── 성장 게이지 바 ────────────────────────────────────────────────────────────
 class _GrowthBar extends StatelessWidget {
   final int level;
@@ -380,16 +611,16 @@ class _GrowthBar extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: level / 100.0),
               duration: const Duration(milliseconds: 800),
               curve: Curves.easeOutCubic,
               builder: (_, v, _) => LinearProgressIndicator(
                 value: v,
-                minHeight: 8,
-                backgroundColor: Colors.white.withValues(alpha: 0.18),
-                valueColor: const AlwaysStoppedAnimation(AppTheme.softMoss),
+                minHeight: 10,
+                backgroundColor: Colors.white.withValues(alpha: 0.15),
+                valueColor: const AlwaysStoppedAnimation(Color(0xFF7ECBA9)),
               ),
             ),
           ),

@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- AI(그림일기·분석) 기능을 위한 인터넷 접근. 그 외 권한은 사용하지 않음 -->
+    <!-- 인터넷: AI·날씨 API -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 위치: 현재 날씨 기반 일기 추천 (대략적인 정확도만 사용) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
         android:label="마음 정원"
         android:name="${applicationName}"

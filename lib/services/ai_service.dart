@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
@@ -114,6 +115,45 @@ class AiService {
       return null;
     } catch (_) {
       return null; // 이미지 실패는 조용히 폴백
+    }
+  }
+
+  // ── 아동용: 사진 분석 → 일기 주제 질문 3개 ─────────────────────────────────
+  // API 키가 있을 때만 호출. 실패하면 null 반환(조용히 폴백).
+  Future<List<String>?> analyzePhotoForPrompts(String imagePath) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final mime =
+          imagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+      const prompt = '''
+이 사진을 보고, 초등학생 아이가 오늘 있었던 일을 일기에 잘 쓸 수 있도록 도와줘.
+사진 속 장소·사물·사람·분위기를 참고해서 아이가 답하기 쉬운 질문 3개를 만들어줘.
+
+아래 형식만 출력해줘 (다른 말은 쓰지 말 것):
+Q1: [질문]
+Q2: [질문]
+Q3: [질문]
+
+규칙: 초등학생이 이해할 쉬운 한국어. 각 질문은 20자 이내. 답하기 쉬운 열린 질문.''';
+
+      final content = Content.multi([
+        DataPart(mime, bytes),
+        TextPart(prompt),
+      ]);
+
+      final res = await _model.generateContent([content]);
+      final text = res.text?.trim();
+      if (text == null || text.isEmpty) return null;
+
+      final prompts = <String>[];
+      for (final line in text.split('\n')) {
+        final m = RegExp(r'^Q\d+:\s*(.+)$').firstMatch(line.trim());
+        if (m != null) prompts.add(m.group(1)!.trim());
+      }
+      return prompts.isEmpty ? null : prompts;
+    } catch (_) {
+      return null;
     }
   }
 

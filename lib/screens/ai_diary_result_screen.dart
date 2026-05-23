@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../services/ai_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_background.dart';
 
 /// 일기 제출 직후 AI가 만든 그림일기(그림 + 서술/공감 답글)를 보여준다.
 class AiDiaryResultScreen extends StatefulWidget {
@@ -75,19 +76,8 @@ class _AiDiaryResultScreenState extends State<AiDiaryResultScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF0D1F14), Color(0xFF1B3A2D)],
-              ),
-            ),
-          ),
-          SafeArea(
+      body: WarmBackground(
+        child: SafeArea(
             child: Column(
               children: [
                 Padding(
@@ -114,8 +104,7 @@ class _AiDiaryResultScreenState extends State<AiDiaryResultScreen> {
               ],
             ),
           ),
-        ],
-      ),
+        ),
     );
   }
 
