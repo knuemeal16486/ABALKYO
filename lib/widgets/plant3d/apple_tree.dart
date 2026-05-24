@@ -83,8 +83,9 @@ class _AppleBuilder {
       final ba = lp(0.45, 0.82, rng.nextDouble()); // 부모와의 분기각
       final phi = phi0 + i * 2.39996 + (rng.nextDouble() - 0.5) * 0.5;
       var cd = dir.rotateAxis(side, ba).rotateAxis(dir, phi).normalized;
-      // 위로 살짝 향성(굴광성)
-      cd = (cd + const V3(0, 0.25, 0)).normalized;
+      // 위로 살짝 향성(굴광성)과 중력 영향(무게감)
+      final gravity = (len * len) * 0.00002 * (depth + 1);
+      cd = (cd + const V3(0, 0.25, 0) - V3(0, gravity, 0)).normalized;
       // 줄기(depth0)에선 가지를 줄기 따라 분산 배치
       final cpos = depth == 0
           ? pos + dir * (segLen * lp(0.35, 0.96, i / (n - 0.999)))
@@ -130,7 +131,11 @@ class _AppleBuilder {
       final ripe = sstep(0.86, 1.0, g);
       final col = Color.lerp(const Color(0xFF9CCC65), const Color(0xFFD32F2F),
           ripe.clamp(0.0, 1.0))!;
-      scene.add(SpherePrim(pos + dir * lp(2, 6, ra), lp(2, 9, ra), col));
+      final appleDist = lp(2, 6, ra);
+      final appleR = lp(2, 9, ra);
+      final appleCenter = pos + dir * appleDist + const V3(0, -1, 0) * (appleDist * 0.5); // 무게 때문에 아래로 처짐
+      scene.add(BranchPrim(pos, appleCenter + const V3(0, 1, 0) * (appleR * 0.8), 0.8, 0.4, const Color(0xFF5D4037))); // 꼭지
+      scene.add(SpherePrim(appleCenter, appleR, col, glossy: true));
     }
   }
 
@@ -141,10 +146,8 @@ class _AppleBuilder {
     final w = outDir.anyPerp;
     final normal = outDir.cross(w).normalized;
     final tip = base + outDir * s;
-    final p1 = base + outDir * (s * 0.42) + w * (s * 0.34);
-    final p2 = base + outDir * (s * 0.42) - w * (s * 0.34);
-    scene.add(QuadPrim([base, p1, tip, p2], normal, _leafTint(),
-        veinColor: const Color(0xFF2E7D32)));
+    scene.add(LeafPrim(base, tip, normal, s * 0.65, _leafTint(),
+        veinColor: const Color(0xFF2E7D32), shininess: 8.0, specIntensity: 0.15));
   }
 
   void _blossom(V3 center, double a) {
