@@ -92,7 +92,8 @@ class _AppleBuilder {
       final ba = lp(0.42, 0.78, rng.nextDouble());
       final phi = phi0 + i * 2.39996 + (rng.nextDouble() - 0.5) * 0.5;
       var cd = dir.rotateAxis(side, ba).rotateAxis(dir, phi).normalized;
-      cd = (cd + const V3(0, 0.22, 0)).normalized;
+      final gravity = (len * len) * 0.00002 * (depth + 1);
+      cd = (cd + const V3(0, 0.25, 0) - V3(0, gravity, 0)).normalized;
       final cpos = depth == 0
           ? pos + dir * (segLen * lp(0.28, 0.96, i / (n - 0.999)))
           : end;
@@ -147,10 +148,8 @@ class _AppleBuilder {
     final w = outDir.anyPerp;
     final normal = outDir.cross(w).normalized;
     final tip = base + outDir * s;
-    final p1 = base + outDir * (s * 0.42) + w * (s * 0.34);
-    final p2 = base + outDir * (s * 0.42) - w * (s * 0.34);
-    scene.add(QuadPrim([base, p1, tip, p2], normal, _leafTint(),
-        veinColor: const Color(0xFF2E7D32)));
+    scene.add(LeafPrim(base, tip, normal, s * 0.65, _leafTint(),
+        veinColor: const Color(0xFF2E7D32), shininess: 8.0, specIntensity: 0.15));
   }
 
   // ══════════════════════════════════════════════════════════════════════════

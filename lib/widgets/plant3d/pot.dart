@@ -6,6 +6,9 @@ import 'engine.dart';
 const double kPotHeight = 60.0;
 
 void addPot(Scene scene) {
+  // 바닥 그림자
+  scene.add(DropShadowPrim(const V3(0, -kPotHeight + 2, 0), 85, 85, 0.35));
+
   const topR = 56.0;    // 화분 몸통 상단(입구) 반지름
   const botR = 41.0;    // 화분 바닥 반지름
   const rimR = 63.0;    // 림(테두리) 외곽 반지름
