@@ -95,11 +95,11 @@ class _ScenePainter extends CustomPainter {
     final fit = (size.height / 580).clamp(0.45, 2.0);
     final cam = Cam(
       yaw: yaw,
-      pitch: -0.14,
-      focal: 900 * fit,
+      pitch: 0.42,
+      focal: 720 * fit,
       camDist: 900,
       cx: size.width / 2,
-      cy: size.height - 80 * fit,
+      cy: size.height * 0.80,
       windT: windPhase * math.pi * 2,
       windAmp: 4.5,
       refH: 230,
