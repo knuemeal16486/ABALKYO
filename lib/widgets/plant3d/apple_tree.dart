@@ -92,8 +92,9 @@ class _AppleBuilder {
       final ba = lp(0.42, 0.78, rng.nextDouble());
       final phi = phi0 + i * 2.39996 + (rng.nextDouble() - 0.5) * 0.5;
       var cd = dir.rotateAxis(side, ba).rotateAxis(dir, phi).normalized;
-      final gravity = (len * len) * 0.00002 * (depth + 1);
-      cd = (cd + const V3(0, 0.25, 0) - V3(0, gravity, 0)).normalized;
+      // 깊이에 비례한 완만한 처짐 — trunk(0) 무처짐, 끝가지(3+) 약간 처짐
+      final gravity = (depth * 0.06).clamp(0.0, 0.18);
+      cd = (cd + V3(0, 0.25 - gravity, 0)).normalized;
       final cpos = depth == 0
           ? pos + dir * (segLen * lp(0.28, 0.96, i / (n - 0.999)))
           : end;

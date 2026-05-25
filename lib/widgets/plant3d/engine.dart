@@ -480,7 +480,7 @@ class Scene {
     for (final p in prims) {
       p.project(cam);
     }
-    prims.sort((a, b) => b.depth.compareTo(a.depth)); // Z값이 큰 것(먼 것)부터 렌더링
+    prims.sort((a, b) => a.depth.compareTo(b.depth)); // 먼 것(z 작은 것)부터 → painter's algorithm
     for (final p in prims) {
       p.draw(canvas);
     }
