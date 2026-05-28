@@ -23,6 +23,7 @@ class PlantSpecies {
   final String name;
   final String emoji;
   final String description;
+  final List<String> tags;
   final List<PlantStageInfo> stages;
 
   const PlantSpecies({
@@ -30,6 +31,7 @@ class PlantSpecies {
     required this.name,
     required this.emoji,
     required this.description,
+    this.tags = const [],
     required this.stages,
   });
 }
@@ -42,6 +44,7 @@ class PlantDictionary {
       name: '마음의 사과나무',
       emoji: '🍎',
       description: '사계절의 변화를 보여주며 꽃을 피우고 빨간 열매를 맺는 사과나무입니다.',
+      tags: ['#인내하는나', '#사계절감성', '#꽃과열매', '#특별한결실'],
       stages: [
         PlantStageInfo('seed', '씨앗 파종', 0),
         PlantStageInfo('germination', '발아', 8),
@@ -57,6 +60,7 @@ class PlantDictionary {
       name: '씩씩한 토마토',
       emoji: '🍅',
       description: '노란 꽃을 피우고 초록에서 빨간 열매로 익어가는 토마토입니다.',
+      tags: ['#도전정신', '#빠른성장', '#활기차게', '#열매맺기'],
       stages: [
         PlantStageInfo('seed', '씨앗 파종', 0),
         PlantStageInfo('germination', '발아', 10),
@@ -72,6 +76,7 @@ class PlantDictionary {
       name: '풍성한 포도나무',
       emoji: '🍇',
       description: '덩굴을 뻗으며 자라나 탐스러운 포도송이를 매달리는 포도나무입니다.',
+      tags: ['#풍요로운마음', '#함께자라기', '#넉넉함', '#알알이소중'],
       stages: [
         PlantStageInfo('cutting', '삽목 발근', 0),
         PlantStageInfo('newShoot', '새순 돋움', 12),
@@ -87,6 +92,7 @@ class PlantDictionary {
       name: '봄의 벚꽃나무',
       emoji: '🌸',
       description: '봄이 되면 분홍 꽃이 눈처럼 만발하는 아름다운 벚꽃나무입니다.',
+      tags: ['#낭만감성', '#봄날의설렘', '#화려한개화', '#분홍빛꿈'],
       stages: [
         PlantStageInfo('seed', '씨앗 파종', 0),
         PlantStageInfo('germination', '발아', 8),
@@ -102,6 +108,7 @@ class PlantDictionary {
       name: '향기로운 라벤더',
       emoji: '💜',
       description: '보라색 꽃이삭이 바람에 흔들리며 달콤한 향기를 내뿜는 라벤더입니다.',
+      tags: ['#차분한나', '#향기로운일상', '#힐링타임', '#꾸준히'],
       stages: [
         PlantStageInfo('seed', '씨앗 파종', 0),
         PlantStageInfo('germination', '발아', 10),
