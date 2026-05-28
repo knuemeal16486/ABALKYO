@@ -1,14 +1,13 @@
-// ⚠️  이 파일은 플레이스홀더입니다.
-// 실제 Firebase 프로젝트 연결을 위해서는 다음 단계를 수행해주세요:
+// Firebase 설정 파일
+// ─────────────────────────────────────────────────────────────────────────────
+// 아래 2가지 값만 Firebase 콘솔에서 확인해서 채워넣으면 됩니다:
 //
-// 1. Firebase 콘솔(console.firebase.google.com)에서 새 프로젝트를 생성하세요.
-// 2. Flutter 앱을 등록하세요 (패키지명: mind_diary 또는 실제 패키지명).
-// 3. 터미널에서 아래 명령어를 실행하세요:
-//    dart pub global activate flutterfire_cli
-//    flutterfire configure
-// 4. 생성된 firebase_options.dart 파일로 이 파일을 교체하세요.
+//  ① messagingSenderId  →  Firebase 콘솔 → 프로젝트 설정 → "프로젝트 번호" (숫자)
+//  ② appId              →  Firebase 콘솔 → 프로젝트 설정 → 내 앱 → 앱 ID
+//                           (예: 1:123456789:android:abc123...)
 //
-// 그 전까지는 Firebase 기능이 비활성화되고 로컬 모드로만 동작합니다.
+// 그 전까지는 Firebase 기능 없이 앱이 정상 동작합니다 (로컬 모드).
+// ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
@@ -24,35 +23,34 @@ class DefaultFirebaseOptions {
         return ios;
       default:
         throw UnsupportedError(
-          'DefaultFirebaseOptions: 이 플랫폼은 지원되지 않습니다. '
-          'flutterfire configure를 먼저 실행해주세요.',
+          'DefaultFirebaseOptions: 지원하지 않는 플랫폼입니다.',
         );
     }
   }
 
-  // TODO: flutterfire configure 실행 후 아래 값들을 실제 값으로 교체하세요.
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_WEB_API_KEY',
-    appId: 'YOUR_WEB_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
+    apiKey: 'AIzaSyCol4EQSaZwPsc__IHIr2e_DLy6rYZQhgc',
+    authDomain: 'abalkyo.firebaseapp.com',
+    projectId: 'abalkyo',
+    storageBucket: 'abalkyo.firebasestorage.app',
+    messagingSenderId: 'YOUR_PROJECT_NUMBER',   // ← ① 프로젝트 번호
+    appId: 'YOUR_WEB_APP_ID',                  // ← ② 웹 앱 ID
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_ANDROID_API_KEY',
-    appId: 'YOUR_ANDROID_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
+    apiKey: 'AIzaSyCol4EQSaZwPsc__IHIr2e_DLy6rYZQhgc',
+    projectId: 'abalkyo',
+    storageBucket: 'abalkyo.firebasestorage.app',
+    messagingSenderId: 'YOUR_PROJECT_NUMBER',   // ← ① 프로젝트 번호
+    appId: 'YOUR_ANDROID_APP_ID',              // ← ② Android 앱 ID
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR_IOS_API_KEY',
-    appId: 'YOUR_IOS_APP_ID',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    iosBundleId: 'YOUR_IOS_BUNDLE_ID',
+    apiKey: 'AIzaSyCol4EQSaZwPsc__IHIr2e_DLy6rYZQhgc',
+    projectId: 'abalkyo',
+    storageBucket: 'abalkyo.firebasestorage.app',
+    messagingSenderId: 'YOUR_PROJECT_NUMBER',   // ← ① 프로젝트 번호
+    appId: 'YOUR_IOS_APP_ID',                  // ← ② iOS 앱 ID
+    iosBundleId: 'com.minddiary.app',
   );
 }
