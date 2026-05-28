@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../models/app_models.dart';
+import '../models/weather_model.dart';
 import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_weather_theme.dart';
@@ -64,8 +65,10 @@ class _PlantTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final isRaining = provider.isRaining;
-    final plant = provider.currentPlant;
-    final sky = TimeWeatherTheme.get(rain: isRaining);
+    final plant    = provider.currentPlant;
+    final weather  = provider.weather;
+    final sky = TimeWeatherTheme.get(
+        weather: weather, emotionRain: isRaining);
 
     return Stack(
       fit: StackFit.expand,
@@ -231,6 +234,15 @@ class _PlantTab extends StatelessWidget {
 
               const SizedBox(height: 8),
 
+              // 날씨 정보 스트립
+              if (weather != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                  child: _WeatherStrip(weather: weather, sky: sky),
+                ),
+
+              const SizedBox(height: 4),
+
               // 오늘의 정원 한마디
               _DailyAffirmation(
                   growthLevel: plant.growthLevel,
@@ -245,6 +257,7 @@ class _PlantTab extends StatelessWidget {
                     growthLevel: plant.growthLevel,
                     seed: plant.seed,
                     wiltFactor: plant.wiltFactor,
+                    windAmp: weather?.windAmp ?? 4.0,
                   ),
                 ),
               ),
@@ -727,4 +740,59 @@ class _RainPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RainPainter _) => true;
+}
+
+// ── 날씨 스트립 ──────────────────────────────────────────────────────────────
+class _WeatherStrip extends StatelessWidget {
+  final WeatherData weather;
+  final SkyTheme sky;
+  const _WeatherStrip({required this.weather, required this.sky});
+
+  @override
+  Widget build(BuildContext context) {
+    final temp   = weather.displayTemp;
+    final emoji  = weather.conditionEmoji;
+    final label  = weather.conditionLabel;
+    final city   = weather.stationName;
+    final humid  = weather.humidity;
+    final wind   = weather.windSpeed;
+    final rain   = weather.rainfall;
+
+    final parts = <String>[
+      '$emoji $label',
+      '🌡 ${temp.round()}°C',
+      if (humid != null) '💧 ${humid.round()}%',
+      if (wind != null) '🌬 ${wind.toStringAsFixed(1)}m/s',
+      if (rain != null && rain > 0) '☔ ${rain.toStringAsFixed(1)}mm',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '📍 $city',
+            style: const TextStyle(
+                color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Container(width: 1, height: 12, color: Colors.white24),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              parts.join('  ·  '),
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

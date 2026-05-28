@@ -17,12 +17,14 @@ class PlantView extends StatefulWidget {
   final int growthLevel;
   final int seed;
   final double wiltFactor; // 0.0(건강) ~ 1.0(완전 시듦)
+  final double windAmp;    // 실제 풍속에서 변환된 바람 진폭 (기본 4.0)
   const PlantView({
     super.key,
     required this.type,
     required this.growthLevel,
     required this.seed,
     this.wiltFactor = 0.0,
+    this.windAmp = 4.0,
   });
 
   @override
@@ -145,7 +147,8 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
                   alignment: const Alignment(0, 0.45),
                   child: CustomPaint(
                     painter: _ScenePainter(
-                        scene, _yaw, _windCtrl.value, widget.wiltFactor),
+                        scene, _yaw, _windCtrl.value, widget.wiltFactor,
+                        windAmp: widget.windAmp),
                     size: Size.infinite,
                   ),
                 );
@@ -257,7 +260,9 @@ class _ScenePainter extends CustomPainter {
   final double yaw;
   final double windPhase;
   final double wiltFactor;
-  _ScenePainter(this.scene, this.yaw, this.windPhase, this.wiltFactor);
+  final double windAmp;
+  _ScenePainter(this.scene, this.yaw, this.windPhase, this.wiltFactor,
+      {this.windAmp = 4.0});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -317,7 +322,7 @@ class _ScenePainter extends CustomPainter {
       cx: cx,
       cy: groundY,
       windT: windPhase * math.pi * 2,
-      windAmp: 4.0,
+      windAmp: windAmp,
       refH: 240,
     );
     scene.render(canvas, cam);
@@ -340,5 +345,6 @@ class _ScenePainter extends CustomPainter {
       o.scene != scene ||
       o.yaw != yaw ||
       o.windPhase != windPhase ||
-      o.wiltFactor != wiltFactor;
+      o.wiltFactor != wiltFactor ||
+      o.windAmp != windAmp;
 }

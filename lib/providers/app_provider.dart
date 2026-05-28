@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/app_models.dart';
+import '../models/weather_model.dart';
+import '../services/weather_service.dart';
 
 class AppProvider with ChangeNotifier {
   static const _kOnboarded     = 'onboarded';
@@ -51,8 +53,13 @@ class AppProvider with ChangeNotifier {
   final List<HarvestedPlant> _collection = [];
   List<HarvestedPlant> get collection => List.unmodifiable(_collection);
 
-  bool _isRaining = false;
-  bool get isRaining => _isRaining;
+  // 날씨 (기상청 KMA 실측 데이터)
+  WeatherData? _weather;
+  WeatherData? get weather => _weather;
+
+  // isRaining: 감정 일기 → 위로의 비 OR 실제 기상청 강수
+  bool _emotionRain = false;
+  bool get isRaining => _emotionRain || (_weather?.isRainy ?? false);
   Timer? _rainTimer;
 
   String _apiKey = '';
@@ -111,6 +118,23 @@ class AppProvider with ChangeNotifier {
     _checkWilting();
     _loaded = true;
     notifyListeners();
+    // 날씨는 비동기로 로드 (앱 시작을 막지 않음)
+    _fetchWeather();
+  }
+
+  Future<void> _fetchWeather() async {
+    final data = await WeatherService.fetchData();
+    if (data != null) {
+      _weather = data;
+      notifyListeners();
+    }
+  }
+
+  // 수동 새로고침 (설정 화면 등에서 호출)
+  Future<void> refreshWeather() async {
+    final prefs = _prefs;
+    if (prefs != null) await prefs.remove('kma_weather_v2');
+    await _fetchWeather();
   }
 
   // ── 시들기 체크 — 앱 열 때마다 호출 ──────────────────────────────────────
@@ -237,7 +261,7 @@ class AppProvider with ChangeNotifier {
         plantedAt: DateTime.now(),
         seed: _newSeed());
     _onboarded = false;
-    _isRaining = false;
+    _emotionRain = false;
     _rainTimer?.cancel();
     await _save();
     notifyListeners();
@@ -267,10 +291,10 @@ class AppProvider with ChangeNotifier {
   // ── 실제 식물 케어 알고리즘 ─────────────────────────────────────────────
   void _growFromDiary(String emotion, String text) {
     if (Emotions.isComforting(emotion)) {
-      _isRaining = true;
+      _emotionRain = true;
       _rainTimer?.cancel();
       _rainTimer = Timer(const Duration(seconds: 6), () {
-        _isRaining = false;
+        _emotionRain = false;
         notifyListeners();
       });
     }

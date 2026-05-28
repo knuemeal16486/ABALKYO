@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/weather_model.dart';
 
 class SkyTheme {
   /// 홈 화면 하늘 그라데이션 (밝은, 3-stop)
@@ -27,19 +28,63 @@ class SkyTheme {
 }
 
 class TimeWeatherTheme {
-  static SkyTheme get({bool rain = false}) {
-    if (rain) {
-      return const SkyTheme(
-        colors: [Color(0xFF9EB8D0), Color(0xFFBDD5E8), Color(0xFFE4F0F8)],
-        warmColors: [Color(0xFF182638), Color(0xFF243A52)],
-        particleColor: Color(0xFF90A4AE),
+  // weather: 기상청 실측 데이터, emotionRain: 위로의 비(감정 일기 트리거)
+  static SkyTheme get({WeatherData? weather, bool emotionRain = false}) {
+    final h = DateTime.now().hour;
+    final condition = weather?.condition;
+    final isRainy   = emotionRain || (weather?.isRainy ?? false);
+
+    // ── 비 ──────────────────────────────────────────────────────────────────
+    if (isRainy) {
+      // 시간대별 비 색조 (새벽·밤은 더 어둡게)
+      final dark = h < 6 || h >= 22;
+      return SkyTheme(
+        colors: dark
+            ? const [Color(0xFF374B5E), Color(0xFF4E6478), Color(0xFF7090A8)]
+            : const [Color(0xFF9EB8D0), Color(0xFFBDD5E8), Color(0xFFE4F0F8)],
+        warmColors: const [Color(0xFF182638), Color(0xFF243A52)],
+        particleColor: const Color(0xFF90A4AE),
         label: '🌧 비',
-        glowColor: Color(0xFF78A9C8),
-        accentColor: Color(0xFFB0C8D8),
+        glowColor: const Color(0xFF78A9C8),
+        accentColor: const Color(0xFFB0C8D8),
       );
     }
 
-    final h = DateTime.now().hour;
+    // ── 흐림 / 구름많음 ────────────────────────────────────────────────────
+    if (condition == WeatherCondition.overcast ||
+        condition == WeatherCondition.cloudy) {
+      // 시간대 기반 색을 채도 낮춘 회색톤으로 블렌드
+      return _cloudyVariant(_timeTheme(h), condition == WeatherCondition.overcast);
+    }
+
+    // ── 구름조금: 시간대 테마를 약간만 부드럽게 ────────────────────────────
+    if (condition == WeatherCondition.partlyCloudy) {
+      return _timeTheme(h); // 거의 동일, label만 조정 가능
+    }
+
+    // ── 맑음 or 날씨 데이터 없음: 시간대 테마 그대로 ───────────────────────
+    return _timeTheme(h);
+  }
+
+  static SkyTheme _cloudyVariant(SkyTheme base, bool heavy) {
+    Color grey(Color c) {
+      final t = heavy ? 0.48 : 0.28;
+      final r = ((c.red   * 255) * (1 - t) + 180 * t).round().clamp(0, 255);
+      final g = ((c.green * 255) * (1 - t) + 185 * t).round().clamp(0, 255);
+      final b = ((c.blue  * 255) * (1 - t) + 195 * t).round().clamp(0, 255);
+      return Color.fromARGB(255, r, g, b);
+    }
+    return SkyTheme(
+      colors      : base.colors.map(grey).toList(),
+      warmColors  : base.warmColors,
+      particleColor: grey(base.particleColor),
+      label       : heavy ? '☁️ 흐림' : '🌥 구름',
+      glowColor   : grey(base.glowColor),
+      accentColor : grey(base.accentColor),
+    );
+  }
+
+  static SkyTheme _timeTheme(int h) {
 
     // ── 새벽 0–5: 보라 → 장미 → 복숭아 크림 ─────────────────────────────
     if (h < 6) {
