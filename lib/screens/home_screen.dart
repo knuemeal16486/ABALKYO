@@ -748,26 +748,27 @@ class _WeatherStrip extends StatelessWidget {
   final SkyTheme sky;
   const _WeatherStrip({required this.weather, required this.sky});
 
+  static IconData _conditionIcon(WeatherCondition c) {
+    switch (c) {
+      case WeatherCondition.sunny:        return Icons.wb_sunny_outlined;
+      case WeatherCondition.partlyCloudy: return Icons.wb_cloudy_outlined;
+      case WeatherCondition.cloudy:       return Icons.cloud_outlined;
+      case WeatherCondition.overcast:     return Icons.cloud;
+      case WeatherCondition.rainy:        return Icons.water_drop_outlined;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final temp   = weather.displayTemp;
-    final emoji  = weather.conditionEmoji;
-    final label  = weather.conditionLabel;
-    final city   = weather.stationName;
-    final humid  = weather.humidity;
-    final wind   = weather.windSpeed;
-    final rain   = weather.rainfall;
-
-    final parts = <String>[
-      '$emoji $label',
-      '🌡 ${temp.round()}°C',
-      if (humid != null) '💧 ${humid.round()}%',
-      if (wind != null) '🌬 ${wind.toStringAsFixed(1)}m/s',
-      if (rain != null && rain > 0) '☔ ${rain.toStringAsFixed(1)}mm',
-    ];
+    final cond  = weather.condition;
+    final temp  = weather.displayTemp;
+    final city  = weather.stationName;
+    final humid = weather.humidity;
+    final wind  = weather.windSpeed;
+    final rain  = weather.rainfall;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(24),
@@ -776,23 +777,55 @@ class _WeatherStrip extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            '📍 $city',
-            style: const TextStyle(
-                color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 8),
-          Container(width: 1, height: 12, color: Colors.white24),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              parts.join('  ·  '),
-              style: const TextStyle(color: Colors.white, fontSize: 11),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          // 도시
+          const Icon(Icons.location_on_outlined, color: Colors.white70, size: 12),
+          const SizedBox(width: 3),
+          Text(city,
+              style: const TextStyle(
+                  color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+          _divider(),
+          // 날씨 상태
+          Icon(_conditionIcon(cond), color: Colors.white, size: 13),
+          const SizedBox(width: 3),
+          Text(weather.conditionLabel,
+              style: const TextStyle(color: Colors.white, fontSize: 11)),
+          _divider(),
+          // 기온
+          const Icon(Icons.device_thermostat_outlined, color: Colors.white, size: 13),
+          const SizedBox(width: 2),
+          Text('${temp.round()}°C',
+              style: const TextStyle(color: Colors.white, fontSize: 11)),
+          // 습도
+          if (humid != null) ...[
+            _divider(),
+            const Icon(Icons.water_drop_outlined, color: Colors.white, size: 13),
+            const SizedBox(width: 2),
+            Text('${humid.round()}%',
+                style: const TextStyle(color: Colors.white, fontSize: 11)),
+          ],
+          // 풍속
+          if (wind != null) ...[
+            _divider(),
+            const Icon(Icons.air, color: Colors.white, size: 13),
+            const SizedBox(width: 2),
+            Text('${wind.toStringAsFixed(1)}m/s',
+                style: const TextStyle(color: Colors.white, fontSize: 11)),
+          ],
+          // 강수량
+          if (rain != null && rain > 0) ...[
+            _divider(),
+            const Icon(Icons.umbrella_outlined, color: Colors.white, size: 13),
+            const SizedBox(width: 2),
+            Text('${rain.toStringAsFixed(1)}mm',
+                style: const TextStyle(color: Colors.white, fontSize: 11)),
+          ],
         ],
       ),
     );
   }
+
+  Widget _divider() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7),
+        child: Container(width: 1, height: 11, color: Colors.white24),
+      );
 }
