@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/achievement.dart';
@@ -7,7 +8,10 @@ import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import 'achievements_screen.dart';
+import 'class_creation_screen.dart';
+import 'class_join_screen.dart';
 import 'stats_screen.dart';
+import 'teacher_dashboard_screen.dart';
 import 'teacher_report_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -54,6 +58,10 @@ class SettingsScreen extends StatelessWidget {
                     _ApiKeyTile(hasKey: provider.aiEnabled),
                     const SizedBox(height: 12),
                     _ReportTile(enabled: provider.aiEnabled),
+                    const SizedBox(height: 24),
+
+                    _SectionTitle('수업 관리'),
+                    _ClassSection(provider: provider),
                     const SizedBox(height: 24),
 
                     _SectionTitle('감정 기록 & 성취'),
@@ -573,6 +581,256 @@ class _InfoCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 수업 관리 섹션
+// ══════════════════════════════════════════════════════════════════════════════
+class _ClassSection extends StatelessWidget {
+  final AppProvider provider;
+  const _ClassSection({required this.provider});
+
+  void _openDashboard(BuildContext context) {
+    final codeCtrl = TextEditingController(
+        text: provider.inClass ? provider.classCode : '');
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF2D1550),
+        title: const Text('교사 대시보드',
+            style: TextStyle(color: AppTheme.dawnGlow)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('학급 코드를 입력하면 학생들의 식물과 일기를 볼 수 있어요.',
+                style: TextStyle(
+                    color: AppTheme.textSubtle, fontSize: 12, height: 1.5)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: codeCtrl,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 6,
+              style: const TextStyle(
+                  color: AppTheme.dawnGlow,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 5),
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                counterText: '',
+                hintText: 'ABC123',
+                hintStyle: TextStyle(color: AppTheme.textSubtle),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('취소',
+                  style: TextStyle(color: AppTheme.textSubtle))),
+          TextButton(
+              onPressed: () {
+                final code = codeCtrl.text.trim().toUpperCase();
+                if (code.isEmpty) return;
+                Navigator.pop(dialogCtx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TeacherDashboardScreen(
+                      classCode: code,
+                      apiKey: provider.apiKey,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('입장',
+                  style: TextStyle(color: AppTheme.softMoss))),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // 현재 수업 상태
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: _cardDeco(),
+          child: provider.inClass
+              ? Row(
+                  children: [
+                    const Text('🏫', style: TextStyle(fontSize: 20)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('학급 코드: ${provider.classCode}',
+                              style: const TextStyle(
+                                  color: AppTheme.dawnGlow,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 2),
+                          const Text('수업에 참여 중이에요',
+                              style: TextStyle(
+                                  color: AppTheme.textSubtle, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(
+                            ClipboardData(text: provider.classCode));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                '코드 ${provider.classCode} 를 복사했어요'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppTheme.softMoss,
+                          ),
+                        );
+                      },
+                      child: const Icon(Icons.copy_rounded,
+                          color: AppTheme.softMoss, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () => showDialog(
+                        context: context,
+                        builder: (dialogCtx) => AlertDialog(
+                          backgroundColor: const Color(0xFF2D1550),
+                          title: const Text('수업 나가기',
+                              style: TextStyle(color: AppTheme.dawnGlow)),
+                          content: const Text(
+                              '수업에서 나가면 선생님 화면에서 내 식물이 보이지 않아요.',
+                              style: TextStyle(
+                                  color: AppTheme.textSubtle, height: 1.5)),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.pop(dialogCtx),
+                                child: const Text('취소',
+                                    style: TextStyle(
+                                        color: AppTheme.textSubtle))),
+                            TextButton(
+                                onPressed: () {
+                                  context.read<AppProvider>().leaveClass();
+                                  Navigator.pop(dialogCtx);
+                                },
+                                child: const Text('나가기',
+                                    style: TextStyle(
+                                        color: Color(0xFFE57373)))),
+                          ],
+                        ),
+                      ),
+                      child: const Icon(Icons.logout_rounded,
+                          color: Color(0xFFE57373), size: 18),
+                    ),
+                  ],
+                )
+              : GestureDetector(
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ClassJoinScreen())),
+                  child: Row(
+                    children: [
+                      const Text('🔗', style: TextStyle(fontSize: 20)),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('수업 참여',
+                                style: TextStyle(
+                                    color: AppTheme.dawnGlow,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600)),
+                            SizedBox(height: 2),
+                            Text('선생님께 받은 코드로 수업에 참여',
+                                style: TextStyle(
+                                    color: AppTheme.textSubtle, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppTheme.textSubtle, size: 22),
+                    ],
+                  ),
+                ),
+        ),
+        const SizedBox(height: 10),
+        // 새 수업 만들기 (교사용)
+        GestureDetector(
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(
+                  builder: (_) => const ClassCreationScreen())),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: _cardDeco(),
+            child: const Row(
+              children: [
+                Text('➕', style: TextStyle(fontSize: 20)),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('새 학급 만들기 (교사)',
+                          style: TextStyle(
+                              color: AppTheme.dawnGlow,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
+                      SizedBox(height: 2),
+                      Text('학급 코드 생성 후 학생들과 공유',
+                          style:
+                              TextStyle(color: AppTheme.textSubtle, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: AppTheme.textSubtle, size: 22),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        // 교사 대시보드 입장
+        GestureDetector(
+          onTap: () => _openDashboard(context),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: _cardDeco(),
+            child: const Row(
+              children: [
+                Text('🧑‍🏫', style: TextStyle(fontSize: 20)),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('교사 대시보드',
+                          style: TextStyle(
+                              color: AppTheme.dawnGlow,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
+                      SizedBox(height: 2),
+                      Text('우리 반 학생 식물 & 일기 현황 보기',
+                          style:
+                              TextStyle(color: AppTheme.textSubtle, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: AppTheme.textSubtle, size: 22),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

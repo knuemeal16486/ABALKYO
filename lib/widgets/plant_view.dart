@@ -16,11 +16,13 @@ class PlantView extends StatefulWidget {
   final PlantType type;
   final int growthLevel;
   final int seed;
+  final double wiltFactor; // 0.0(건강) ~ 1.0(완전 시듦)
   const PlantView({
     super.key,
     required this.type,
     required this.growthLevel,
     required this.seed,
+    this.wiltFactor = 0.0,
   });
 
   @override
@@ -142,7 +144,8 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
                   scale: _zoom,
                   alignment: const Alignment(0, 0.45),
                   child: CustomPaint(
-                    painter: _ScenePainter(scene, _yaw, _windCtrl.value),
+                    painter: _ScenePainter(
+                        scene, _yaw, _windCtrl.value, widget.wiltFactor),
                     size: Size.infinite,
                   ),
                 );
@@ -153,6 +156,36 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
           IgnorePointer(
             child: CreatureOverlay(growthLevel: widget.growthLevel),
           ),
+          // 시들기 경고 오버레이
+          if (widget.wiltFactor > 0.3)
+            Positioned(
+              top: 12,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: widget.wiltFactor.clamp(0.0, 1.0),
+                    duration: const Duration(milliseconds: 600),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFB8860B).withValues(alpha: 0.80),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        '💧 일기를 써서 물을 줘요!',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // 줌 레벨 표시 (기본값 벗어났을 때만)
           if (_zoom < 0.98 || _zoom > 1.02)
             Positioned(
@@ -223,14 +256,23 @@ class _ScenePainter extends CustomPainter {
   final Scene scene;
   final double yaw;
   final double windPhase;
-  _ScenePainter(this.scene, this.yaw, this.windPhase);
+  final double wiltFactor;
+  _ScenePainter(this.scene, this.yaw, this.windPhase, this.wiltFactor);
 
   @override
   void paint(Canvas canvas, Size size) {
     final fit = (size.height / 580).clamp(0.45, 2.0);
     final cx = size.width / 2;
-    // 더 많은 공간 — 식물이 화면에 꽉 참
     final groundY = size.height - 65 * fit;
+
+    // 시들기 효과: 황갈색 레이어를 식물 위에 덧입힘
+    final useWilt = wiltFactor > 0.01;
+    if (useWilt) {
+      canvas.saveLayer(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Paint(),
+      );
+    }
 
     // ── 배경 방사 환경광 ─────────────────────────────────────────────────
     canvas.drawCircle(
@@ -269,9 +311,9 @@ class _ScenePainter extends CustomPainter {
     // ── 3D 식물 씬 렌더링 ─────────────────────────────────────────────────
     final cam = Cam(
       yaw: yaw,
-      pitch: -0.22,         // 조금 더 내려다보는 시점 (was -0.14)
-      focal: 1050 * fit,    // 더 크게 (was 900 * fit)
-      camDist: 820,         // (was 900)
+      pitch: -0.22,
+      focal: 1050 * fit,
+      camDist: 820,
       cx: cx,
       cy: groundY,
       windT: windPhase * math.pi * 2,
@@ -279,9 +321,24 @@ class _ScenePainter extends CustomPainter {
       refH: 240,
     );
     scene.render(canvas, cam);
+
+    // 시들기 황갈색 오버레이 (srcATop: 식물 픽셀에만 적용)
+    if (useWilt) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Paint()
+          ..color = const Color(0xFFB8860B)
+              .withValues(alpha: (wiltFactor * 0.50).clamp(0.0, 0.50))
+          ..blendMode = BlendMode.srcATop,
+      );
+      canvas.restore();
+    }
   }
 
   @override
   bool shouldRepaint(_ScenePainter o) =>
-      o.scene != scene || o.yaw != yaw || o.windPhase != windPhase;
+      o.scene != scene ||
+      o.yaw != yaw ||
+      o.windPhase != windPhase ||
+      o.wiltFactor != wiltFactor;
 }

@@ -1,7 +1,9 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'firebase_options.dart';
 import 'providers/app_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -12,6 +14,15 @@ void main() async {
   await SystemChrome.setPreferredOrientations(
       [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
   await initializeDateFormatting('ko_KR', null);
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (_) {
+    // Firebase 미설정 — 로컬 모드로 계속 동작
+  }
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppProvider()..load(),

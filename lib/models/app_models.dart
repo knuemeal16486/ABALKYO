@@ -104,26 +104,46 @@ class Plant {
   final PlantType type;
   final int growthLevel;
   final DateTime plantedAt;
-  final int seed; // 같은 종이라도 개체마다 다른 모습이 되도록 하는 난수 시드
+  final int seed;
+  final int health;               // 0–100: 수분 상태 (100=촉촉, 0=시들시들)
+  final DateTime lastWateredDate; // 마지막으로 일기 쓴 날
 
   Plant({
     required this.type,
     required this.growthLevel,
     required this.plantedAt,
     required this.seed,
-  });
+    this.health = 100,
+    DateTime? lastWateredDate,
+  }) : lastWateredDate = lastWateredDate ?? plantedAt;
+
+  // 시들음 정도 0.0(건강)~1.0(완전 시듦) — 3D 렌더러에 전달
+  double get wiltFactor => health < 60 ? ((60 - health) / 60.0).clamp(0.0, 1.0) : 0.0;
+
+  bool get isWilting => health < 30;
+
+  int get daysSinceWatered {
+    final today = DateTime.now();
+    final last = DateTime(lastWateredDate.year, lastWateredDate.month, lastWateredDate.day);
+    final now  = DateTime(today.year, today.month, today.day);
+    return now.difference(last).inDays;
+  }
 
   Plant copyWith({
     PlantType? type,
     int? growthLevel,
     DateTime? plantedAt,
     int? seed,
+    int? health,
+    DateTime? lastWateredDate,
   }) {
     return Plant(
       type: type ?? this.type,
       growthLevel: growthLevel ?? this.growthLevel,
       plantedAt: plantedAt ?? this.plantedAt,
       seed: seed ?? this.seed,
+      health: health ?? this.health,
+      lastWateredDate: lastWateredDate ?? this.lastWateredDate,
     );
   }
 
@@ -132,7 +152,6 @@ class Plant {
   bool get isFullyGrown => growthLevel >= 100;
 
   PlantStageInfo get currentStageInfo {
-    // 현재 성장 수치에 맞는 가장 높은 단계를 반환
     return species.stages.reversed.firstWhere(
       (s) => growthLevel >= s.requiredGrowth,
       orElse: () => species.stages.first,
@@ -144,6 +163,8 @@ class Plant {
         'growthLevel': growthLevel,
         'plantedAt': plantedAt.toIso8601String(),
         'seed': seed,
+        'health': health,
+        'lastWateredDate': lastWateredDate.toIso8601String(),
       };
 
   factory Plant.fromJson(Map<String, dynamic> j) {
@@ -155,6 +176,9 @@ class Plant {
       plantedAt: planted,
       seed: (j['seed'] as num?)?.toInt() ??
           (planted.millisecondsSinceEpoch & 0x7fffffff),
+      health: (j['health'] as num?)?.toInt() ?? 100,
+      lastWateredDate:
+          DateTime.tryParse(j['lastWateredDate'] as String? ?? '') ?? planted,
     );
   }
 }

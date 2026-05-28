@@ -6,6 +6,7 @@ import '../providers/app_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/time_weather_theme.dart';
 import '../widgets/seed_picker.dart';
+import 'class_join_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -26,10 +27,47 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool get _canStart =>
       _nameCtrl.text.trim().isNotEmpty && _selected != null;
 
-  void _start() {
-    context
+  Future<void> _start() async {
+    await context
         .read<AppProvider>()
         .completeOnboarding(_nameCtrl.text, _selected!);
+    if (!mounted) return;
+    // 수업 참여 선택지 제공 (선택 사항)
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF2D1550),
+        title: const Text('수업에 참여할까요?',
+            style: TextStyle(color: AppTheme.dawnGlow, fontSize: 18)),
+        content: Text(
+          '선생님께 받은 학급 코드가 있다면 수업에 참여할 수 있어요.\n'
+          '코드가 없다면 혼자 사용해도 괜찮아요!',
+          style: TextStyle(
+              color: AppTheme.textSubtle, fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('혼자 시작하기',
+                  style: TextStyle(color: AppTheme.textSubtle))),
+          TextButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const ClassJoinScreen(fromOnboarding: true),
+                  ),
+                );
+              },
+              child: const Text('수업 참여',
+                  style: TextStyle(
+                      color: AppTheme.softMoss, fontWeight: FontWeight.bold))),
+        ],
+      ),
+    );
   }
 
   @override

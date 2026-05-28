@@ -244,6 +244,7 @@ class _PlantTab extends StatelessWidget {
                     type: plant.type,
                     growthLevel: plant.growthLevel,
                     seed: plant.seed,
+                    wiltFactor: plant.wiltFactor,
                   ),
                 ),
               ),
