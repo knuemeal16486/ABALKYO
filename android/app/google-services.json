@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "188811688938",
+    "project_id": "abalkyo",
+    "storage_bucket": "abalkyo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:188811688938:android:REPLACE_WITH_ANDROID_APP_ID",
+        "android_client_info": {
+          "package_name": "com.minddiary.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCol4EQSaZwPsc__IHIr2e_DLy6rYZQhgc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
