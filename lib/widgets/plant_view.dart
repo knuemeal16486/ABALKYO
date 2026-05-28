@@ -1,23 +1,24 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import 'creature_overlay.dart';
-import 'plant3d/engine.dart';
-import 'plant3d/plant_builder.dart';
+import 'plant2d/apple_tree_painter.dart';
+import 'plant2d/tomato_painter.dart';
+import 'plant2d/grapevine_painter.dart';
+import 'plant2d/cherry_blossom_painter.dart';
+import 'plant2d/lavender_painter.dart';
 import 'plant_background.dart';
 
-/// 식물 3D 뷰어
-///  · 핀치 줌 (0.5× ~ 3.0×) — 두 손가락 벌리기/오므리기
-///  · 한 손가락 드래그 → yaw 회전
-///  · 더블탭 → 초기화 (yaw=0, zoom=1.0)
-///  · ClipRect으로 다른 UI 침범 방지
+/// 식물 2D 로우폴리 뷰어
+///  · 핀치 줌 (0.5× ~ 3.0×)
+///  · 성장에 따른 자동 줌 아웃 (g=0 → 1.0×, g=1 → 0.52×)
+///  · 더블탭 → 수동 줌 초기화
 class PlantView extends StatefulWidget {
   final PlantType type;
   final int growthLevel;
   final int seed;
-  final double wiltFactor; // 0.0(건강) ~ 1.0(완전 시듦)
-  final double windAmp;    // 실제 풍속에서 변환된 바람 진폭 (기본 4.0)
+  final double wiltFactor;
+  final double windAmp;
   const PlantView({
     super.key,
     required this.type,
@@ -35,30 +36,18 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
   late final AnimationController _windCtrl;
   late final AnimationController _growCtrl;
 
-  double _yaw = 0;
-  double _zoom = 1.0;
+  double _manualZoom = 1.0;
   double _zoomBase = 1.0;
 
   double _fromG = 0;
   double _toG = 0;
 
-  Scene? _scene;
-  double? _builtG;
-  int? _cseed;
-  PlantType? _ctype;
-  int? _cmonth;
-
   @override
   void initState() {
     super.initState();
     _fromG = _toG = widget.growthLevel / 100.0;
-
-    _windCtrl =
-        AnimationController(vsync: this, duration: const Duration(seconds: 16))
-          ..repeat();
-
-    _growCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1800));
+    _windCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 16))..repeat();
+    _growCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
     _growCtrl.value = 1.0;
   }
 
@@ -84,6 +73,12 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
     return _fromG + (_toG - _fromG) * t;
   }
 
+  // 자동 줌 아웃: g=0 → 1.0, g=1 → 0.52 (sqrt 커브)
+  double _autoZoom(double g) {
+    final t = math.sqrt(g.clamp(0.0, 1.0));
+    return 1.0 - 0.48 * t;
+  }
+
   @override
   void dispose() {
     _windCtrl.dispose();
@@ -91,22 +86,35 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Scene _ensureScene(double g) {
+  CustomPainter _buildPainter(double g, double windPhase) {
     final month = DateTime.now().month;
-    final gStep = (g * 100).floor();
-    final builtStep = _builtG == null ? -1 : (_builtG! * 100).floor();
-    if (_scene == null ||
-        gStep != builtStep ||
-        _cseed != widget.seed ||
-        _ctype != widget.type ||
-        _cmonth != month) {
-      _scene = buildPlantScene(widget.type, g, widget.seed, month);
-      _builtG = g;
-      _cseed = widget.seed;
-      _ctype = widget.type;
-      _cmonth = month;
+    switch (widget.type) {
+      case PlantType.appleTree:
+        return AppleTreePainter(
+          g: g, windPhase: windPhase, windAmp: widget.windAmp,
+          wiltFactor: widget.wiltFactor, seed: widget.seed, month: month,
+        );
+      case PlantType.tomato:
+        return TomatoPainter(
+          g: g, windPhase: windPhase, windAmp: widget.windAmp,
+          wiltFactor: widget.wiltFactor, seed: widget.seed,
+        );
+      case PlantType.grapevine:
+        return GrapevinePainter(
+          g: g, windPhase: windPhase, windAmp: widget.windAmp,
+          wiltFactor: widget.wiltFactor, seed: widget.seed,
+        );
+      case PlantType.cherryBlossom:
+        return CherryBlossomPainter(
+          g: g, windPhase: windPhase, windAmp: widget.windAmp,
+          wiltFactor: widget.wiltFactor, seed: widget.seed, month: month,
+        );
+      case PlantType.lavender:
+        return LavenderPainter(
+          g: g, windPhase: windPhase, windAmp: widget.windAmp,
+          wiltFactor: widget.wiltFactor, seed: widget.seed,
+        );
     }
-    return _scene!;
   }
 
   @override
@@ -115,7 +123,7 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 성장 단계별 배경
+          // 고정 야외 배경
           AnimatedBuilder(
             animation: _windCtrl,
             builder: (_, _) => PlantBackground(
@@ -123,32 +131,26 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
               windPhase: _windCtrl.value,
             ),
           ),
+          // 식물 페인터 (핀치 줌 + 자동 줌 아웃)
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onScaleStart: (_) => _zoomBase = _zoom,
+            onScaleStart: (_) => _zoomBase = _manualZoom,
             onScaleUpdate: (d) => setState(() {
               if (d.pointerCount >= 2) {
-                _zoom = (_zoomBase * d.scale).clamp(0.50, 3.2);
-              } else {
-                _yaw += d.focalPointDelta.dx * 0.010;
+                _manualZoom = (_zoomBase * d.scale).clamp(0.50, 3.2);
               }
             }),
-            onDoubleTap: () => setState(() {
-              _yaw = 0;
-              _zoom = 1.0;
-            }),
+            onDoubleTap: () => setState(() => _manualZoom = 1.0),
             child: AnimatedBuilder(
-              animation: _windCtrl,
+              animation: Listenable.merge([_windCtrl, _growCtrl]),
               builder: (_, _) {
                 final g = _currentG;
-                final scene = _ensureScene(g);
+                final zoom = _manualZoom * _autoZoom(g);
                 return Transform.scale(
-                  scale: _zoom,
+                  scale: zoom,
                   alignment: const Alignment(0, 0.45),
                   child: CustomPaint(
-                    painter: _ScenePainter(
-                        scene, _yaw, _windCtrl.value, widget.wiltFactor,
-                        windAmp: widget.windAmp),
+                    painter: _buildPainter(g, _windCtrl.value),
                     size: Size.infinite,
                   ),
                 );
@@ -156,10 +158,8 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
             ),
           ),
           // 생물 오버레이
-          IgnorePointer(
-            child: CreatureOverlay(growthLevel: widget.growthLevel),
-          ),
-          // 시들기 경고 오버레이
+          IgnorePointer(child: CreatureOverlay(growthLevel: widget.growthLevel)),
+          // 시들기 경고
           if (widget.wiltFactor > 0.3)
             Positioned(
               top: 12,
@@ -171,56 +171,46 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
                     opacity: widget.wiltFactor.clamp(0.0, 1.0),
                     duration: const Duration(milliseconds: 600),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                       decoration: BoxDecoration(
                         color: const Color(0xFFB8860B).withValues(alpha: 0.80),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
                         '💧 일기를 써서 물을 줘요!',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          // 줌 레벨 표시 (기본값 벗어났을 때만)
-          if (_zoom < 0.98 || _zoom > 1.02)
+          // 수동 줌 표시 (기본값 벗어났을 때만)
+          if (_manualZoom < 0.98 || _manualZoom > 1.02)
             Positioned(
               top: 8,
               right: 10,
               child: IgnorePointer(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: Colors.black38,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    '${(_zoom * 100).round()}%',
-                    style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500),
+                    '${(_manualZoom * 100).round()}%',
+                    style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
                   ),
                 ),
               ),
             ),
-          // 힌트 (첫 로드 후 잠깐)
+          // 힌트
           Positioned(
             bottom: 10,
             left: 0,
             right: 0,
             child: IgnorePointer(
-              child: Center(
-                child: _ZoomHint(zoom: _zoom),
-              ),
+              child: Center(child: _ZoomHint(zoom: _manualZoom)),
             ),
           ),
         ],
@@ -229,7 +219,6 @@ class _PlantViewState extends State<PlantView> with TickerProviderStateMixin {
   }
 }
 
-/// 줌이 기본값(1.0)일 때만 힌트 표시
 class _ZoomHint extends StatelessWidget {
   final double zoom;
   const _ZoomHint({required this.zoom});
@@ -238,7 +227,7 @@ class _ZoomHint extends StatelessWidget {
   Widget build(BuildContext context) {
     if (zoom < 0.98 || zoom > 1.02) return const SizedBox.shrink();
     return AnimatedOpacity(
-      opacity: 0.55,
+      opacity: 0.50,
       duration: const Duration(milliseconds: 400),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -247,104 +236,10 @@ class _ZoomHint extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: const Text(
-          '핀치로 확대 · 드래그로 회전 · 더블탭 초기화',
+          '핀치로 확대 · 더블탭 초기화',
           style: TextStyle(color: Colors.white70, fontSize: 10),
         ),
       ),
     );
   }
-}
-
-class _ScenePainter extends CustomPainter {
-  final Scene scene;
-  final double yaw;
-  final double windPhase;
-  final double wiltFactor;
-  final double windAmp;
-  _ScenePainter(this.scene, this.yaw, this.windPhase, this.wiltFactor,
-      {this.windAmp = 4.0});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fit = (size.height / 580).clamp(0.45, 2.0);
-    final cx = size.width / 2;
-    final groundY = size.height - 65 * fit;
-
-    // 시들기 효과: 황갈색 레이어를 식물 위에 덧입힘
-    final useWilt = wiltFactor > 0.01;
-    if (useWilt) {
-      canvas.saveLayer(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        Paint(),
-      );
-    }
-
-    // ── 배경 방사 환경광 ─────────────────────────────────────────────────
-    canvas.drawCircle(
-      Offset(cx, groundY - 80 * fit),
-      190 * fit,
-      Paint()
-        ..shader = ui.Gradient.radial(
-          Offset(cx, groundY - 80 * fit),
-          190 * fit,
-          [const Color(0x20FFFFFF), const Color(0x00FFFFFF)],
-        ),
-    );
-
-    // ── 바닥 그림자 타원 ─────────────────────────────────────────────────
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(cx, groundY + 24 * fit),
-        width: 220 * fit,
-        height: 30 * fit,
-      ),
-      Paint()
-        ..color = const Color(0x32000000)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 20 * fit),
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset(cx, groundY + 17 * fit),
-        width: 160 * fit,
-        height: 15 * fit,
-      ),
-      Paint()
-        ..color = const Color(0x10FFFFFF)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 10 * fit),
-    );
-
-    // ── 3D 식물 씬 렌더링 ─────────────────────────────────────────────────
-    final cam = Cam(
-      yaw: yaw,
-      pitch: -0.22,
-      focal: 1050 * fit,
-      camDist: 820,
-      cx: cx,
-      cy: groundY,
-      windT: windPhase * math.pi * 2,
-      windAmp: windAmp,
-      refH: 240,
-    );
-    scene.render(canvas, cam);
-
-    // 시들기 황갈색 오버레이 (srcATop: 식물 픽셀에만 적용)
-    if (useWilt) {
-      canvas.drawRect(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        Paint()
-          ..color = const Color(0xFFB8860B)
-              .withValues(alpha: (wiltFactor * 0.50).clamp(0.0, 0.50))
-          ..blendMode = BlendMode.srcATop,
-      );
-      canvas.restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ScenePainter o) =>
-      o.scene != scene ||
-      o.yaw != yaw ||
-      o.windPhase != windPhase ||
-      o.wiltFactor != wiltFactor ||
-      o.windAmp != windAmp;
 }
