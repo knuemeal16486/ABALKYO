@@ -1,8 +1,9 @@
 enum PlantType {
-  appleTree, // 사과나무 (장미과, 꽃·과실 중심)
-  sunflower, // 해바라기 (쌍떡잎식물, 꽃 중심)
-  succulent, // 다육식물 (영양생식, 로제트형 잎 중심)
-  fern       // 양치식물 (포자번식, 프랙탈 기하학 잎)
+  appleTree,     // 사과나무 (장미과, 계절 변화 · 꽃 · 과실)
+  tomato,        // 토마토 (꽃→열매, 아이들에게 친숙)
+  grapevine,     // 포도나무 (덩굴 · 포도송이, 독특한 실루엣)
+  cherryBlossom, // 벚꽃나무 (한국 봄 정서, 분홍 만개)
+  lavender,      // 라벤더 (보라 수직 이삭, 허브)
 }
 
 PlantType plantTypeFromName(String? name) =>
@@ -40,7 +41,7 @@ class PlantDictionary {
       type: PlantType.appleTree,
       name: '마음의 사과나무',
       emoji: '🍎',
-      description: '사계절의 변화를 보여주며 꽃을 피우고 열매를 맺는 사과나무입니다.',
+      description: '사계절의 변화를 보여주며 꽃을 피우고 빨간 열매를 맺는 사과나무입니다.',
       stages: [
         PlantStageInfo('seed', '씨앗 파종', 0),
         PlantStageInfo('germination', '발아', 8),
@@ -51,48 +52,64 @@ class PlantDictionary {
         PlantStageInfo('fruiting', '결실 · 수확', 90),
       ],
     ),
-    PlantType.sunflower: PlantSpecies(
-      type: PlantType.sunflower,
-      name: '활달한 해바라기',
-      emoji: '🌻',
-      description: '슬픔을 먹고 크고 밝은 꽃을 피우는 해바라기입니다.',
+    PlantType.tomato: PlantSpecies(
+      type: PlantType.tomato,
+      name: '씩씩한 토마토',
+      emoji: '🍅',
+      description: '노란 꽃을 피우고 초록에서 빨간 열매로 익어가는 토마토입니다.',
       stages: [
         PlantStageInfo('seed', '씨앗 파종', 0),
-        PlantStageInfo('germination', '발아 및 뿌리내림', 10),
-        PlantStageInfo('cotyledon', '떡잎 출현', 25),
-        PlantStageInfo('trueLeaves', '본잎 성장', 45),
-        PlantStageInfo('budding', '화아분화 (꽃봉오리)', 65),
-        PlantStageInfo('blooming', '만개 (꽃 피움)', 85),
-        PlantStageInfo('seeding', '결실 (씨앗 맺힘)', 100),
+        PlantStageInfo('germination', '발아', 10),
+        PlantStageInfo('trueLeaves', '본잎 성장', 25),
+        PlantStageInfo('stemGrowth', '줄기 성장', 42),
+        PlantStageInfo('flowering', '노란 꽃 개화', 60),
+        PlantStageInfo('greenFruit', '초록 열매 형성', 76),
+        PlantStageInfo('ripening', '빨간 토마토 수확', 92),
       ],
     ),
-    PlantType.succulent: PlantSpecies(
-      type: PlantType.succulent,
-      name: '묵묵한 다육식물',
-      emoji: '🪴',
-      description: '어려운 환경에서도 수분을 머금고 단단하게 자라납니다.',
+    PlantType.grapevine: PlantSpecies(
+      type: PlantType.grapevine,
+      name: '풍성한 포도나무',
+      emoji: '🍇',
+      description: '덩굴을 뻗으며 자라나 탐스러운 포도송이를 매달리는 포도나무입니다.',
       stages: [
-        PlantStageInfo('leaf_cutting', '잎꽂이 (안착)', 0),
-        PlantStageInfo('rooting', '잔뿌리 발달', 15),
-        PlantStageInfo('pup', '자구(아기 다육) 발생', 30),
-        PlantStageInfo('rosette', '로제트 형성', 50),
-        PlantStageInfo('maturing', '영양 성장기 (다육질화)', 75),
-        PlantStageInfo('coloring', '단풍 들기', 90),
-        PlantStageInfo('rare_bloom', '희귀한 개화', 100),
+        PlantStageInfo('cutting', '삽목 발근', 0),
+        PlantStageInfo('newShoot', '새순 돋움', 12),
+        PlantStageInfo('vining', '덩굴 뻗기', 28),
+        PlantStageInfo('lushLeaves', '잎 무성', 45),
+        PlantStageInfo('flowerCluster', '꽃송이 형성', 62),
+        PlantStageInfo('greenGrapes', '초록 포도 열림', 78),
+        PlantStageInfo('harvest', '자주빛 포도 수확', 95),
       ],
     ),
-    PlantType.fern: PlantSpecies(
-      type: PlantType.fern,
-      name: '포용력 있는 고사리',
-      emoji: '🌿',
-      description: '어두운 곳에서도 생명력을 뻗어내는 신비로운 양치식물입니다.',
+    PlantType.cherryBlossom: PlantSpecies(
+      type: PlantType.cherryBlossom,
+      name: '봄의 벚꽃나무',
+      emoji: '🌸',
+      description: '봄이 되면 분홍 꽃이 눈처럼 만발하는 아름다운 벚꽃나무입니다.',
       stages: [
-        PlantStageInfo('spore', '포자 안착', 0),
-        PlantStageInfo('prothallus', '전엽체 형성', 15),
-        PlantStageInfo('fiddlehead', '크로지어(어린 잎) 출현', 35),
-        PlantStageInfo('unrolling', '프랙탈 잎사귀 펼쳐짐', 55),
-        PlantStageInfo('mature', '성숙한 양치잎', 80),
-        PlantStageInfo('sporangia', '포자낭군 형성', 100),
+        PlantStageInfo('seed', '씨앗 파종', 0),
+        PlantStageInfo('germination', '발아', 8),
+        PlantStageInfo('seedling', '묘목', 18),
+        PlantStageInfo('youngTree', '어린나무', 35),
+        PlantStageInfo('mature', '성목', 58),
+        PlantStageInfo('budding', '꽃봉오리', 76),
+        PlantStageInfo('fullBloom', '만개 (벚꽃)', 90),
+      ],
+    ),
+    PlantType.lavender: PlantSpecies(
+      type: PlantType.lavender,
+      name: '향기로운 라벤더',
+      emoji: '💜',
+      description: '보라색 꽃이삭이 바람에 흔들리며 달콤한 향기를 내뿜는 라벤더입니다.',
+      stages: [
+        PlantStageInfo('seed', '씨앗 파종', 0),
+        PlantStageInfo('germination', '발아', 10),
+        PlantStageInfo('rosette', '로제트 잎 형성', 25),
+        PlantStageInfo('stemGrowth', '줄기 형성', 42),
+        PlantStageInfo('spikeEmergence', '꽃대 출현', 62),
+        PlantStageInfo('blooming', '보라 꽃 개화', 78),
+        PlantStageInfo('fullBloom', '만개 · 향기 절정', 95),
       ],
     ),
   };

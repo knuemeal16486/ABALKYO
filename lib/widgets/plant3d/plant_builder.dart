@@ -12,12 +12,14 @@ Scene buildPlantScene(PlantType type, double g, int seed, int month) {
   switch (type) {
     case PlantType.appleTree:
       buildAppleTree(scene, g, seed, month);
-    case PlantType.sunflower:
-      buildSunflower(scene, g, seed);
-    case PlantType.succulent:
-      buildSucculent(scene, g, seed);
-    case PlantType.fern:
-      buildFern(scene, g, seed);
+    case PlantType.tomato:
+      buildTomato(scene, g, seed);
+    case PlantType.grapevine:
+      buildGrapevine(scene, g, seed);
+    case PlantType.cherryBlossom:
+      buildCherryBlossom(scene, g, seed, month);
+    case PlantType.lavender:
+      buildLavender(scene, g, seed);
   }
   return scene;
 }
