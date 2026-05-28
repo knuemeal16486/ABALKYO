@@ -13,6 +13,7 @@ import '../widgets/plant_view.dart';
 import '../widgets/seed_picker.dart';
 import 'diary_screen.dart';
 import 'calendar_screen.dart';
+import 'habit_plan_screen.dart';
 import 'settings_screen.dart';
 import 'stats_screen.dart';
 
@@ -172,6 +173,14 @@ class _PlantTab extends StatelessWidget {
                               context.read<AppProvider>().devAdvanceGrowth()),
                       const SizedBox(width: 8),
                     ],
+                    _IconBtn(
+                        icon: Icons.spa_rounded,
+                        color: AppTheme.textDark,
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const HabitPlanScreen()))),
+                    const SizedBox(width: 8),
                     _IconBtn(
                         icon: Icons.bar_chart_rounded,
                         color: AppTheme.textDark,

@@ -73,7 +73,7 @@ class AppProvider with ChangeNotifier {
 
     _onboarded   = prefs.getBool(_kOnboarded) ?? false;
     _studentName = prefs.getString(_kName) ?? '';
-    _apiKey      = prefs.getString(_kApiKey) ?? '';
+    _apiKey      = prefs.getString(_kApiKey) ?? 'AIzaSyBc6OkXIhqKwN_6X5nn1Uh6kgmFjIBe_k8';
     _classCode   = prefs.getString(_kClassCode) ?? '';
 
     // 기기마다 고유한 studentUid 보장

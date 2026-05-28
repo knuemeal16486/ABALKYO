@@ -10,6 +10,7 @@ import '../services/class_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_background.dart';
 import 'student_detail_screen.dart';
+import '../services/ai_service.dart';
 
 class TeacherDashboardScreen extends StatelessWidget {
   final String classCode;
@@ -74,15 +75,42 @@ class TeacherDashboardScreen extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.softMoss,
-        foregroundColor: AppTheme.softCloud,
-        onPressed: () => _showClassCodeDialog(context),
-        icon: const Text('📋', style: TextStyle(fontSize: 20)),
-        label: const Text(
-          '학급 코드',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'ai_report',
+            backgroundColor: const Color(0xFF7B5EA7),
+            foregroundColor: Colors.white,
+            onPressed: () => _showClassReport(context, classCode, apiKey),
+            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            label: const Text('학급 AI 리포트',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'class_code',
+            backgroundColor: AppTheme.softMoss,
+            foregroundColor: AppTheme.softCloud,
+            onPressed: () => _showClassCodeDialog(context),
+            icon: const Text('📋', style: TextStyle(fontSize: 20)),
+            label: const Text('학급 코드',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClassReport(BuildContext context, String classCode, String apiKey) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ClassReportSheet(
+        classCode: classCode,
+        apiKey: apiKey,
       ),
     );
   }
@@ -492,6 +520,216 @@ class _ErrorView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── 학급 AI 리포트 시트 ────────────────────────────────────────────────────────
+
+class _ClassReportSheet extends StatefulWidget {
+  final String classCode;
+  final String apiKey;
+  const _ClassReportSheet({required this.classCode, required this.apiKey});
+
+  @override
+  State<_ClassReportSheet> createState() => _ClassReportSheetState();
+}
+
+class _ClassReportSheetState extends State<_ClassReportSheet> {
+  bool _loading = true;
+  String? _report;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _generate();
+  }
+
+  Future<void> _generate() async {
+    setState(() { _loading = true; _error = null; _report = null; });
+    try {
+      // 최신 학생 목록을 Firestore에서 한 번만 읽어옴
+      final snapshot = await FirebaseFirestore.instance
+          .collection('classes')
+          .doc(widget.classCode)
+          .collection('students')
+          .get();
+
+      final students = snapshot.docs.map((doc) {
+        final data = doc.data();
+        final rawEmotions = (data['recentEntries'] as List<dynamic>? ?? [])
+            .take(5)
+            .map((e) {
+              final emotion = (e as Map<String, dynamic>)['emotion'] as String? ?? '';
+              return emotion;
+            })
+            .where((e) => e.isNotEmpty)
+            .toList();
+        return StudentSummaryData(
+          name: data['name'] as String? ?? '이름 없음',
+          recentEmotions: rawEmotions,
+          streakDays: (data['streakDays'] as num?)?.toInt() ?? 0,
+          wroteTodayDiary: data['wroteTodayDiary'] as bool? ?? false,
+          health: (data['health'] as num?)?.toInt() ?? 100,
+        );
+      }).toList();
+
+      final svc = AiService(widget.apiKey);
+      final report = await svc.generateClassSummary(
+        classCode: widget.classCode,
+        students: students,
+      );
+      if (!mounted) return;
+      setState(() { _report = report; _loading = false; });
+    } on AiException catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.message; _loading = false; });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1035),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.auto_awesome_rounded,
+                      color: Color(0xFFCE93D8), size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '학급 AI 리포트',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: _loading
+                        ? const SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Color(0xFFCE93D8)),
+                            ),
+                          )
+                        : const Icon(Icons.refresh_rounded,
+                            color: Colors.white60, size: 20),
+                    onPressed: _loading ? null : _generate,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(color: Colors.white10, height: 1),
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(Color(0xFFCE93D8)),
+                          ),
+                          SizedBox(height: 16),
+                          Text('AI가 학급 현황을 분석 중이에요...',
+                              style: TextStyle(color: Colors.white54, fontSize: 13)),
+                        ],
+                      ),
+                    )
+                  : _error != null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(_error!,
+                                style: const TextStyle(
+                                    color: Colors.redAccent, fontSize: 14),
+                                textAlign: TextAlign.center),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          controller: ctrl,
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+                          child: _MarkdownReport(text: _report ?? ''),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MarkdownReport extends StatelessWidget {
+  final String text;
+  const _MarkdownReport({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = text.split(RegExp(r'(?=^## )', multiLine: true));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: sections.map((section) {
+        if (section.trim().isEmpty) return const SizedBox.shrink();
+        final lines = section.trim().split('\n');
+        final title = lines.first.replaceAll('## ', '').trim();
+        final body = lines.skip(1).join('\n').trim();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7B5EA7).withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFFCE93D8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                body,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13.5,
+                  height: 1.6,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }
