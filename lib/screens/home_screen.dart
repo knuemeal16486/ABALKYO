@@ -498,7 +498,7 @@ void _showPlantInfoSheet(
       ? 0
       : nextStage.requiredGrowth - plant.growthLevel;
   final entriesNeeded =
-      (toNext / AppProvider.growthPerEntry).ceil();
+      (toNext / 5.0).ceil();
 
   // 이 식물이 소화한 일기 수
   final absorbed = provider.diaryEntries

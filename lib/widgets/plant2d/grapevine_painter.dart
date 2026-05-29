@@ -101,7 +101,7 @@ class GrapevinePainter extends CustomPainter {
         final side = ci % 2 == 0 ? -1.0 : 1.0;
         final hangX = cx + side * postSpread * (0.2 + ci * 0.1);
         final hangY = groundY - postH * (0.55 + (ci ~/ 2) * 0.18);
-        final ripeness = ((g - 0.58) * 2.4).clamp(0, 1.0);
+        final ripeness = ((g - 0.58) * 2.4).clamp(0.0, 1.0);
         _drawGrapeCluster(canvas, Offset(hangX, hangY), fit, ripeness, rng,
           windSway(windPhase + ci * 0.2, 0.75, windAmp));
       }

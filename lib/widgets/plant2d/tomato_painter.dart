@@ -121,7 +121,7 @@ class TomatoPainter extends CustomPainter {
         final wobX = math.sin(seg * 1.3 + seed * 0.1) * 6 * fit;
         final rc = Offset(cx + wobX + (rng.nextDouble() - 0.5) * 35 * fit,
                           groundY - totalH * seg / maxSegs - 4 * fit);
-        final tomatoG = ((g - 0.68) * 3.3).clamp(0, 1.0);
+        final tomatoG = ((g - 0.68) * 3.3).clamp(0.0, 1.0);
         _drawTomato(canvas, rc, lp(6, 13, tomatoG) * fit, tomatoG);
       }
     }

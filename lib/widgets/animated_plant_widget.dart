@@ -171,7 +171,7 @@ class _SparkPainter extends CustomPainter {
     // 꽃잎 중앙 하이라이트
     c.drawOval(
         Rect.fromCenter(
-            center: const Offset(0, -r * 0.2), width: r * 0.4, height: r),
+            center: Offset(0, -r * 0.2), width: r * 0.4, height: r),
         Paint()..color = color.withValues(alpha: alpha * 0.30));
     c.restore();
   }
