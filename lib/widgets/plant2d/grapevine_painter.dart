@@ -155,21 +155,27 @@ class GrapevinePainter extends CustomPainter {
 
     // ── Heart-shaped grape leaves ──────────────────────────────────────────────
     if (g > 0.30) {
-      final leafProgress = sstep(0.30, 0.78, g);
-      const totalLeaves = 8;
+      final leafProgress = sstep(0.30, 0.82, g);
+      const totalLeaves = 14;
       final leafCount =
           (leafProgress * totalLeaves).clamp(0.0, totalLeaves.toDouble()).floor();
 
       // [side(-1/+1), heightFrac, xOffsetUnscaled, leafSizeUnscaled]
       const attachDefs = <List<double>>[
-        [-1.0, 0.26, 20.0, 26.0],
-        [ 1.0, 0.33, -22.0, 24.0],
-        [-1.0, 0.48, 24.0, 31.0],
-        [ 1.0, 0.54, -18.0, 29.0],
-        [-1.0, 0.65, 16.0, 33.0],
-        [ 1.0, 0.68, -24.0, 31.0],
-        [-1.0, 0.80, 22.0, 28.0],
-        [ 1.0, 0.78, -20.0, 27.0],
+        [-1.0, 0.22, 18.0, 24.0],
+        [ 1.0, 0.28, -20.0, 22.0],
+        [-1.0, 0.36, 26.0, 27.0],
+        [ 1.0, 0.42, -24.0, 25.0],
+        [-1.0, 0.50, 22.0, 32.0],
+        [ 1.0, 0.55, -18.0, 30.0],
+        [-1.0, 0.62, 28.0, 34.0],
+        [ 1.0, 0.67, -26.0, 32.0],
+        [-1.0, 0.72, 20.0, 29.0],
+        [ 1.0, 0.76, -22.0, 28.0],
+        [-1.0, 0.82, 16.0, 26.0],
+        [ 1.0, 0.80, -18.0, 25.0],
+        [-1.0, 0.88, 14.0, 22.0],
+        [ 1.0, 0.86, -16.0, 21.0],
       ];
 
       for (int li = 0; li < leafCount; li++) {
@@ -220,7 +226,7 @@ class GrapevinePainter extends CustomPainter {
     if (g > 0.55) {
       final ripeness = ((g - 0.55) * 2.2).clamp(0.0, 1.0);
       const topWireFrac   = 0.85;
-      const clusterXFracs = <double>[-0.50, 0.50, -0.12, 0.20];
+      const clusterXFracs = <double>[-0.35, 0.35];
 
       final clusterCount =
           ((g - 0.55) / 0.45 * clusterXFracs.length)
@@ -471,11 +477,11 @@ class GrapevinePainter extends CustomPainter {
     final shadowColor = Color.lerp(const Color(0xFF558B2F), const Color(0xFF4A148C), ripeness)!;
     final hiColor     = Color.lerp(const Color(0xFFDCEDC8), const Color(0xFFE1BEE7), ripeness)!;
 
-    // Triangular bunch layout: rows 2,3,4,4,3,2 (18 berries)
-    const rowCounts   = <int>[2, 3, 4, 4, 3, 2];
-    const rowYOffsets = <double>[0.0, 9.5, 19.0, 28.5, 38.0, 47.0];
-    final grapeR   = 6.0 * fit;
-    final spacingX = 12.5 * fit;
+    // Conical bunch: wide at top (attached to wire), narrow at bottom — natural grape shape
+    const rowCounts   = <int>[4, 5, 5, 4, 3, 2, 1];
+    const rowYOffsets = <double>[0.0, 9.0, 18.0, 27.0, 36.0, 44.0, 51.0];
+    final grapeR   = 5.5 * fit;
+    final spacingX = 11.5 * fit;
 
     for (int ri = 0; ri < rowCounts.length; ri++) {
       final count    = rowCounts[ri];
@@ -500,8 +506,8 @@ class GrapevinePainter extends CustomPainter {
           hiColor.withValues(alpha: alpha),
         );
 
-        // Pedicel visible on top two rows
-        if (ri < 2) {
+        // Pedicel visible on top three rows
+        if (ri < 3) {
           c.drawLine(
             Offset(gCenter.dx, gCenter.dy - grapeR - 4.0 * fit),
             gCenter,

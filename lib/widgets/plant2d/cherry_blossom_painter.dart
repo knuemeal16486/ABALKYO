@@ -128,40 +128,84 @@ class CherryBlossomPainter extends CustomPainter {
     drawWiltOverlay(canvas, size, wiltFactor);
   }
 
-  // ── Trunk: multi-segment barkBranch with thick taper ─────────────────────
+  // ── Trunk: single smooth bezier path ─────────────────────────────────────
   void _drawTrunk(Canvas canvas, Offset base, Offset tip, double fit, double g, math.Random rng) {
-    const int segs = 5;
-    const Color barkLight = Color(0xFF2D1B0E);
-    const Color barkDark = Color(0xFF1A0A05);
+    final growFrac = sstep(0.07, 0.35, g);
+    if (growFrac <= 0.01) return;
 
-    for (int i = 0; i < segs; i++) {
-      final t0 = i / segs;
-      final t1 = (i + 1) / segs;
-      // Taper thickness: 18*fit at base → 8*fit at top
-      final thick0 = lp(18, 8, t0) * fit;
-      // Only draw segments that have grown (g controls how high trunk reaches)
-      final growFrac = sstep(0.07, 0.35, g);
-      if (t0 > growFrac) break;
+    // Actual tip for current growth stage
+    final actualTip = Offset(
+      lp(base.dx, tip.dx, growFrac),
+      lp(base.dy, tip.dy, growFrac),
+    );
 
-      final segFrom = Offset(
-        lp(base.dx, tip.dx, t0),
-        lp(base.dy, tip.dy, t0),
-      );
-      final segTo = Offset(
-        lp(base.dx, tip.dx, math.min(t1, growFrac)),
-        lp(base.dy, tip.dy, math.min(t1, growFrac)),
-      );
+    final trunkH = (base.dy - actualTip.dy).abs();
+    if (trunkH < 2.0) return;
 
-      barkBranch(
-        canvas,
-        segFrom,
-        segTo,
-        thick0,
-        barkLight,
-        barkDark,
-        lenticels: true,
-        rng: rng,
-      );
+    final halfBase = 9.0 * fit;
+    final halfTop  = 4.0 * fit;
+    // Mid control point — slight rightward bow for organic feel
+    final midX = lp(base.dx, actualTip.dx, 0.50) + 2.0 * fit;
+    final midY = lp(base.dy, actualTip.dy, 0.50);
+    final halfMid = lp(halfBase, halfTop, 0.50);
+
+    // Single smooth tapered trunk path
+    final trunkPath = Path()..moveTo(base.dx - halfBase, base.dy);
+    trunkPath.quadraticBezierTo(midX - halfMid, midY, actualTip.dx - halfTop, actualTip.dy);
+    trunkPath.lineTo(actualTip.dx + halfTop, actualTip.dy);
+    trunkPath.quadraticBezierTo(midX + halfMid, midY, base.dx + halfBase, base.dy);
+    trunkPath.close();
+
+    final rect = Rect.fromLTRB(
+      base.dx - halfBase - 2, actualTip.dy - 2,
+      base.dx + halfBase + 2, base.dy,
+    );
+
+    // Reddish-brown cherry bark with lateral gradient
+    canvas.drawPath(
+      trunkPath,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [
+            Color(0xFF2A0E04),
+            Color(0xFF7A4030),
+            Color(0xFF5A2818),
+            Color(0xFF2A0E04),
+          ],
+          stops: [0.0, 0.28, 0.68, 1.0],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ).createShader(rect),
+    );
+
+    // Subtle gloss
+    canvas.drawPath(
+      trunkPath,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.10),
+            Colors.transparent,
+          ],
+          begin: const Alignment(-0.4, -1.0),
+          end: const Alignment(0.3, 1.0),
+        ).createShader(rect),
+    );
+
+    // Cherry bark: horizontal lenticel bands (characteristic feature)
+    final lRng = math.Random(rng.nextInt(0x7FFFFFFF));
+    final lenticPaint = Paint()
+      ..color = const Color(0xFF8D6B60).withValues(alpha: 0.55)
+      ..strokeWidth = 1.0 * fit
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final lenticCount = (trunkH / (22.0 * fit)).floor().clamp(2, 8);
+    for (int li = 0; li < lenticCount; li++) {
+      final lFrac = (li + 0.5) / lenticCount;
+      final lY = base.dy - lFrac * trunkH;
+      final lW = halfBase * lp(1.0, 0.44, lFrac) * (0.45 + lRng.nextDouble() * 0.30);
+      final lX = lp(base.dx, actualTip.dx, lFrac) + (lRng.nextDouble() - 0.5) * 3.0 * fit;
+      canvas.drawLine(Offset(lX - lW, lY), Offset(lX + lW, lY), lenticPaint);
     }
   }
 
@@ -178,19 +222,19 @@ class CherryBlossomPainter extends CustomPainter {
     double g,
     math.Random rng,
   ) {
-    const Color barkLight = Color(0xFF2D1B0E);
-    const Color barkDark = Color(0xFF1A0A05);
+    const Color barkLight = Color(0xFF6B3A2A);
+    const Color barkDark = Color(0xFF3D1F0A);
 
     // Each entry: [side(-1/+1), trunkHeightFrac, primaryAngleOff, primaryLenScale]
-    // 7 branches at heights 55%–92% of trunk
+    // 7 branches at heights 52%–93% of trunk
     final branchDefs = <List<double>>[
-      [-1.0, 0.55, 0.52, 1.00],
-      [ 1.0, 0.62, 0.48, 0.95],
-      [-1.0, 0.70, 0.50, 0.88],
-      [ 1.0, 0.76, 0.45, 0.82],
-      [-1.0, 0.82, 0.42, 0.72],
-      [ 1.0, 0.87, 0.40, 0.65],
-      [ 0.0, 0.92, 0.10, 0.55], // near-vertical top branch
+      [-1.0, 0.52, 0.95, 1.00],
+      [ 1.0, 0.58, 0.88, 0.95],
+      [-1.0, 0.67, 0.80, 0.88],
+      [ 1.0, 0.73, 0.74, 0.82],
+      [-1.0, 0.81, 0.64, 0.72],
+      [ 1.0, 0.87, 0.55, 0.65],
+      [ 0.0, 0.93, 0.12, 0.55], // near-vertical top branch
     ];
 
     // Branches start appearing at g=0.35, fully out by g=0.85
@@ -310,8 +354,8 @@ class CherryBlossomPainter extends CustomPainter {
 
   // ── Single cherry blossom: 5 petals via petal() + stamen dot ─────────────
   void _drawCherryFlower(Canvas canvas, Offset center, double fit, math.Random rng) {
-    const petalLen = 10.0;
-    const petalWidth = 6.0;
+    const petalLen = 9.0;
+    const petalWidth = 8.5;
     const Color lightPink = Color(0xFFFFF0F5);
     const Color deepPink = Color(0xFFFFB7C5);
 
@@ -321,7 +365,7 @@ class CherryBlossomPainter extends CustomPainter {
       final angleRad = angleDeg * math.pi / 180.0;
 
       // Attach point sits slightly off center so petals radiate naturally
-      final attachDist = petalWidth * 0.5 * fit;
+      final attachDist = petalWidth * 0.35 * fit;
       final attach = Offset(
         center.dx + math.cos(angleRad) * attachDist,
         center.dy + math.sin(angleRad) * attachDist,

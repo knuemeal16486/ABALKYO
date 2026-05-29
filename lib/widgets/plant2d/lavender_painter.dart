@@ -131,7 +131,7 @@ class LavenderPainter extends CustomPainter {
   void _drawAllStems(Canvas canvas, double cx, double groundY, double fit) {
     // Number of stems grows from 3 to 9 as g moves through 0.40→0.65
     final stemCount =
-        ((g - 0.40) / 0.25 * 9.0).clamp(3.0, 9.0).floor();
+        ((g - 0.40) / 0.25 * 7.0).clamp(3.0, 7.0).floor();
 
     // X offsets from cx: centre first, then alternating ±22, ±44, ±66 (px)
     final stemXOffsets = _buildStemOffsets(stemCount, fit);
@@ -204,7 +204,7 @@ class LavenderPainter extends CustomPainter {
     if (stemLen < 1.0) return;
 
     // One bract pair roughly every 20 logical pixels
-    final pairCount = (stemLen / (20.0 * fit)).floor().clamp(0, 7);
+    final pairCount = (stemLen / (28.0 * fit)).floor().clamp(0, 4);
     if (pairCount == 0) return;
 
     // Unit vectors: along stem and perpendicular (rotated 90° CW)
@@ -223,8 +223,8 @@ class LavenderPainter extends CustomPainter {
       );
 
       // Bract dimensions: narrow (3 px) and short (12 px)
-      const bracLen = 12.0;
-      const bracW = 3.0;
+      const bracLen = 9.0;
+      const bracW = 2.2;
 
       for (final side in [-1.0, 1.0]) {
         // Bract tip splays out perpendicular, with a slight upward angle
@@ -235,6 +235,10 @@ class LavenderPainter extends CustomPainter {
             + perpY * side * bracLen * fit
             - udy * bracLen * 0.25 * fit;
 
+        canvas.saveLayer(
+            null,
+            Paint()..color = Colors.white.withValues(alpha: 0.35),
+          );
         botanicalLeaf(
           canvas,
           attach,
@@ -244,6 +248,7 @@ class LavenderPainter extends CustomPainter {
           const Color(0xFF78909C),
           vein: false,
         );
+        canvas.restore();
       }
     }
   }
@@ -266,94 +271,101 @@ class LavenderPainter extends CustomPainter {
     double bloomFrac,
     int stemIdx,
   ) {
-    // Floret count grows from 10 to 18 as bloom fraction rises
-    final floretCount = lp(10.0, 18.0, bloomFrac).round().clamp(10, 18);
+    final actualLen = spikeLen * bloomFrac;
+    if (actualLen < 2.0 * fit) return;
 
-    // Spike sway is slightly amplified vs. stem because the tip is more flexible
     final spikeSway = windSway(windPhase + stemIdx * 0.29, 1.15, windAmp);
-    final swayTipDx = math.sin(spikeSway) * spikeLen * 0.15;
+    final swayDx = math.sin(spikeSway) * spikeLen * 0.12;
+    final midX = stemTip.dx + swayDx * 0.5;
+    final topY = stemTip.dy - actualLen;
 
-    final r = 3.5 * fit;
+    final spikeW = 5.5 * fit;
+    final bodyLeft = midX - spikeW;
+    final bodyRight = midX + spikeW;
+    final bodyTop = topY - spikeW * 0.55;
+    final bodyBottom = stemTip.dy;
+    final bodyRect = Rect.fromLTRB(bodyLeft, bodyTop, bodyRight, bodyBottom);
+    final bodyPath = Path()
+      ..addRRect(RRect.fromRectAndRadius(bodyRect, Radius.circular(spikeW)));
 
-    for (int fi = 0; fi < floretCount; fi++) {
-      // t = 0 (bottom of spike) → 1 (top of spike)
-      final t = floretCount > 1
-          ? fi / (floretCount - 1).toDouble()
-          : 0.0;
+    // Solid spike body with gradient
+    canvas.drawPath(
+      bodyPath,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [
+            Color(0xFFD1A3D8),
+            Color(0xFF9C27B0),
+            Color(0xFF6A1B9A),
+          ],
+          stops: [0.0, 0.40, 1.0],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(bodyRect),
+    );
 
-      // Skip florets that have not yet opened; lower florets open first
+    // Specular highlight
+    canvas.drawPath(
+      bodyPath,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.30, -0.40),
+          radius: 0.65,
+          colors: [
+            Colors.white.withValues(alpha: 0.28),
+            Colors.transparent,
+          ],
+        ).createShader(bodyRect)
+        ..blendMode = BlendMode.srcATop,
+    );
+
+    // Floret texture: small circles in rows
+    final rowCount = (actualLen / (3.2 * fit)).floor().clamp(4, 22);
+    final floretR = 1.8 * fit;
+
+    for (int ri = 0; ri < rowCount; ri++) {
+      final t = ri / math.max(rowCount - 1, 1).toDouble();
       if (t > bloomFrac + 0.08) continue;
-
-      // Fade-in alpha for the opening frontier so the transition is smooth
-      final rawAlpha = t <= bloomFrac
+      final fade = t <= bloomFrac
           ? 1.0
-          : 1.0 - (t - bloomFrac) / 0.08;
-      final floretAlpha = rawAlpha.clamp(0.0, 1.0);
-      if (floretAlpha <= 0.01) continue;
+          : (1.0 - (t - bloomFrac) / 0.08).clamp(0.0, 1.0);
+      if (fade <= 0.01) continue;
 
-      // Position: florets ascend from stemTip; lateral wind lean grows with t
-      final floretX = stemTip.dx + swayTipDx * t;
-      final floretY = stemTip.dy - spikeLen * t;
+      final ry = stemTip.dy - t * actualLen;
+      final profileW = spikeW * 0.85 * math.sin(t * math.pi).clamp(0.20, 1.0);
+      final nPerRow = (profileW / (2.8 * fit)).round().clamp(1, 3);
 
-      // Alternating whorled offset (±2 px) for organic appearance
-      final altOff = (fi % 2 == 0 ? 1.0 : -1.0) * 2.0 * fit;
-      final center = Offset(floretX + altOff, floretY);
-
-      // Lower florets are rich deep purple; upper are lighter mauve —
-      // mirrors the natural colour gradient along a lavender spike.
-      final baseColor = Color.lerp(
-        const Color(0xFF9C27B0), // dark purple  — bottom florets
-        const Color(0xFFBA68C8), // soft lilac   — upper florets
+      final rowColor = Color.lerp(
+        const Color(0xFF9C27B0),
+        const Color(0xFFCE93D8),
         t,
-      )!;
-      final shadowColor = Color.lerp(
-        const Color(0xFF6A1B9A), // deep indigo shadow
-        const Color(0xFF7B1FA2), // medium purple shadow
-        t,
-      )!;
-      final hiColor = Color.lerp(
-        const Color(0xFFCE93D8), // specular highlight — lower
-        const Color(0xFFE1BEE7), // pale highlight     — upper
-        t,
-      )!;
+      )!.withValues(alpha: fade * 0.80);
 
-      // Fade-in frontier florets using a temporary layer with reduced alpha
-      if (floretAlpha < 0.99) {
-        canvas.saveLayer(
-          null,
-          Paint()..color = Colors.white.withValues(alpha: floretAlpha),
+      for (int ci = 0; ci < nPerRow; ci++) {
+        final xOff = nPerRow == 1
+            ? 0.0
+            : (ci - (nPerRow - 1) / 2.0) * 3.0 * fit;
+        canvas.drawCircle(
+          Offset(midX + xOff, ry),
+          floretR,
+          Paint()..color = rowColor,
         );
       }
-
-      glossyFruit(canvas, center, r, baseColor, shadowColor, hiColor);
-
-      if (floretAlpha < 0.99) canvas.restore();
     }
 
-    // ── Spike calyx tip ───────────────────────────────────────────────────────
-    // A tiny dark bud cluster above the topmost open floret completes the shape.
-    if (bloomFrac > 0.70) {
-      final tipAlpha = sstep(0.70, 0.90, bloomFrac);
-      final tipCenter = Offset(
-        stemTip.dx + swayTipDx,
-        stemTip.dy - spikeLen - 3.0 * fit,
-      );
-
-      // Outer bud — dark purple
+    // Tip bud
+    if (bloomFrac > 0.55) {
+      final tipAlpha = sstep(0.55, 0.75, bloomFrac);
       canvas.drawCircle(
-        tipCenter,
+        Offset(midX, bodyTop + spikeW * 0.25),
         2.0 * fit,
         Paint()
-          ..color =
-              const Color(0xFF6A1B9A).withValues(alpha: tipAlpha * 0.85),
+          ..color = const Color(0xFF7B1FA2).withValues(alpha: tipAlpha * 0.88),
       );
-
-      // Inner specular — tiny closed bud highlight
       canvas.drawCircle(
-        Offset(tipCenter.dx - 0.5 * fit, tipCenter.dy - 0.5 * fit),
-        0.85 * fit,
-        Paint()
-          ..color = Colors.white.withValues(alpha: tipAlpha * 0.35),
+        Offset(midX - 0.4 * fit, bodyTop + spikeW * 0.25 - 0.4 * fit),
+        0.7 * fit,
+        Paint()..color = Colors.white.withValues(alpha: tipAlpha * 0.30),
       );
     }
   }

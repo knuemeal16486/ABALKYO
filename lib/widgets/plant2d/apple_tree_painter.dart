@@ -167,49 +167,78 @@ class AppleTreePainter extends CustomPainter {
     drawWiltOverlay(canvas, size, wiltFactor);
   }
 
-  // ── Trunk: 5 barkBranch segments with gentle S-curve wobble ─────────────────
+  // ── Trunk: single smooth tapered bezier path ────────────────────────────────
 
   void _drawTrunk(Canvas canvas, double cx, double groundY, double trunkH,
       double fit, math.Random rng) {
-    const segments = 5;
-    final segH = trunkH / segments;
+    if (trunkH < 2.0) return;
 
-    // S-curve: accumulate a horizontal offset per segment using sin.
-    double prevX = cx;
-    double prevY = groundY;
+    // Gentle S-curve lean based on seed
+    final wobble = math.sin(seed * 0.31) * 5.0 * fit;
+    final topX = cx + wobble;
+    final topY = groundY - trunkH;
+    final midX = cx + wobble * 0.45;
+    final midY = groundY - trunkH * 0.52;
 
-    for (int i = 0; i < segments; i++) {
-      final frac = i / segments;
-      // Thickness tapers from 18 px (base) to 8 px (top).
-      final thick = lp(18, 8, frac) * fit;
+    final halfBase = 9.5 * fit;
+    final halfMid  = 6.5 * fit;
+    final halfTop  = 4.0 * fit;
 
-      // Gentle S-curve: sin wobble, amplitude ±4 px.
-      final wobble = math.sin(i * 0.9 + seed * 0.3) * 4 * fit;
-      final nextX  = cx + wobble;
-      final nextY  = groundY - segH * (i + 1);
+    // Single smooth tapered bezier trunk path
+    final trunkPath = Path()..moveTo(cx - halfBase, groundY);
+    trunkPath.quadraticBezierTo(midX - halfMid, midY, topX - halfTop, topY);
+    trunkPath.lineTo(topX + halfTop, topY);
+    trunkPath.quadraticBezierTo(midX + halfMid, midY, cx + halfBase, groundY);
+    trunkPath.close();
 
-      // Wind sway increases with height.
-      final heightFrac = (i + 1) / segments;
-      final sway = windSway(windPhase, heightFrac, windAmp);
-      canvas.save();
-      canvas.translate(prevX, prevY);
-      canvas.rotate(sway);
+    // Lateral gradient: dark left → lighter centre → dark right
+    final rect = Rect.fromLTRB(cx - halfBase - 2, topY - 2,
+                                cx + halfBase + 2, groundY);
+    canvas.drawPath(
+      trunkPath,
+      Paint()
+        ..shader = LinearGradient(
+          colors: const [
+            Color(0xFF3A2010),
+            Color(0xFF8A6040),
+            Color(0xFF5A3A20),
+            Color(0xFF3A2010),
+          ],
+          stops: const [0.0, 0.30, 0.68, 1.0],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ).createShader(rect),
+    );
 
-      barkBranch(
-        canvas,
-        Offset.zero,
-        Offset(nextX - prevX, nextY - prevY),
-        thick,
-        const Color(0xFF7A5C3A),
-        const Color(0xFF4A3020),
-        lenticels: i == 0,
-        rng: rng,
-      );
+    // Subtle vertical gloss
+    canvas.drawPath(
+      trunkPath,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.12),
+            Colors.transparent,
+          ],
+          begin: const Alignment(-0.5, -1.0),
+          end: const Alignment(0.3, 1.0),
+        ).createShader(rect),
+    );
 
-      canvas.restore();
-
-      prevX = nextX;
-      prevY = nextY;
+    // Horizontal lenticel marks (no visible segment breaks)
+    final lRng = math.Random(seed ^ 0x2F9A);
+    final lenticPaint = Paint()
+      ..color = const Color(0xFF2A1408).withValues(alpha: 0.28)
+      ..strokeWidth = 0.7 * fit
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    for (int li = 0; li < 8; li++) {
+      final lFrac = (li + 0.5) / 8.0;
+      final lY = groundY - lFrac * trunkH;
+      final lWide = halfBase * lp(1.0, 0.42, lFrac) *
+          (0.35 + lRng.nextDouble() * 0.30);
+      final lX = cx + (lRng.nextDouble() - 0.5) * 3.0 * fit;
+      canvas.drawLine(Offset(lX - lWide, lY), Offset(lX + lWide, lY),
+          lenticPaint);
     }
   }
 
