@@ -2,13 +2,23 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'paint_utils.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  AppleTreePainter — botanical illustration style
+//  Stages:
+//    g < 0.06          : seed
+//    0.06 – 0.20       : sprout (thin stem + cotyledons)
+//    0.20 – 0.40       : young tree (trunk + 2 branches + botanical leaves)
+//    0.40 – 0.65       : growing (more branches + leaf clusters)
+//    0.65 – 1.00       : mature (foliageBlob canopy + blossoms or apples)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class AppleTreePainter extends CustomPainter {
-  final double g;          // 0.0–1.0
-  final double windPhase;  // 0.0–1.0
-  final double windAmp;    // 0.0–9.0
-  final double wiltFactor;
+  final double g;          // 0.0–1.0 growth
+  final double windPhase;  // 0.0–1.0 animation phase
+  final double windAmp;    // amplitude multiplier ~4.0
+  final double wiltFactor; // 0.0–1.0
   final int seed;
-  final int month;
+  final int month;         // 1–12 for seasonal appearance
 
   AppleTreePainter({
     required this.g,
@@ -21,207 +31,481 @@ class AppleTreePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(AppleTreePainter o) =>
-    o.g != g || o.windPhase != windPhase || o.wiltFactor != wiltFactor || o.windAmp != windAmp;
+      o.g != g || o.windPhase != windPhase || o.wiltFactor != wiltFactor;
+
+  // ── Season helpers ──────────────────────────────────────────────────────────
+
+  bool get _isSpring => month >= 3 && month <= 5;
+  bool get _isFall   => month == 10 || month == 11;
+
+  List<Color> get _foliageShades {
+    if (_isSpring) {
+      return const [Color(0xFF81C784), Color(0xFF66BB6A), Color(0xFF43A047)];
+    }
+    if (_isFall) {
+      return const [Color(0xFFE65100), Color(0xFFF57F17), Color(0xFFBF360C)];
+    }
+    return const [Color(0xFF2E7D32), Color(0xFF388E3C), Color(0xFF4CAF50)];
+  }
+
+  // ── Branch definitions [angleRad, trunkPosFrac, lengthFrac] ────────────────
+  //   angle is measured from straight-up (–π/2 on the canvas)
+  static const List<List<double>> _branchDefs = [
+    [-0.58, 0.58, 0.80],  // lower left
+    [ 0.54, 0.62, 0.76],  // lower right
+    [-0.38, 0.74, 0.62],  // mid left
+    [ 0.42, 0.78, 0.58],  // mid right
+    [ 0.05, 0.90, 0.44],  // near-top centre
+  ];
+
+  // ── Main paint ──────────────────────────────────────────────────────────────
 
   @override
   void paint(Canvas canvas, Size size) {
-    final fit = size.height / 580;
-    final cx = size.width / 2;
+    final fit     = size.height / 580;
+    final cx      = size.width / 2;
     final groundY = size.height - 65 * fit;
-    final ground = Offset(cx, groundY);
-    final rng = math.Random(seed);
+    final ground  = Offset(cx, groundY);
+    final rng     = math.Random(seed);
 
-    // ── 씨앗 단계 ────────────────────────────────────────────────────────────
+    // ── Stage 0: seed ─────────────────────────────────────────────────────────
     if (g < 0.06) {
-      drawSeed(canvas, ground, fit, sstep(0, 0.06, g) * 1.0);
-      drawPot(canvas, ground, fit);
+      drawSeed(canvas, ground, fit, sstep(0, 0.06, g));
+      realisticPot(canvas, ground, fit);
       drawWiltOverlay(canvas, size, wiltFactor);
       return;
     }
 
-    // ── 줄기 성장 계산 ────────────────────────────────────────────────────────
-    final totalTrunkH = lp(18, 180, sstep(0.06, 0.85, g)) * fit;
-    final trunkSegs = 7;
-    final visibleSegs = ((g - 0.06) / (0.85 - 0.06) * trunkSegs).clamp(0, trunkSegs).floor();
-    final partialFrac = (((g - 0.06) / (0.85 - 0.06) * trunkSegs) % 1.0).clamp(0.0, 1.0);
-    final trunkTopY = groundY - totalTrunkH;
+    // ── Trunk geometry ────────────────────────────────────────────────────────
+    // Full trunk height: 20 px (sprout) → 190 px (mature), scaled by fit.
+    final trunkH = lp(20, 190, sstep(0.06, 0.90, g)) * fit;
+    final trunkTopY = groundY - trunkH;
 
-    // ── 줄기 그리기 ───────────────────────────────────────────────────────────
-    for (int i = 0; i < visibleSegs; i++) {
-      final frac = i < visibleSegs - 1 ? 1.0 : partialFrac;
-      final bot = Offset(cx, groundY - totalTrunkH * i / trunkSegs);
-      final top = Offset(cx + math.sin(i * 0.7 + seed) * 4 * fit,
-                         groundY - totalTrunkH * (i + frac) / trunkSegs);
-      final wB = lp(20, 8, i / trunkSegs) * fit;
-      final wT = lp(20, 8, (i + 1) / trunkSegs) * fit;
-      trunkSegment(canvas, bot, top, wB, wT);
+    _drawTrunk(canvas, cx, groundY, trunkH, fit, rng);
+
+    // ── Stage 1: sprout ────────────────────────────────────────────────────────
+    if (g < 0.20) {
+      _drawCotyledons(canvas, cx, trunkTopY, fit, g);
+      realisticPot(canvas, ground, fit);
+      drawWiltOverlay(canvas, size, wiltFactor);
+      return;
     }
 
-    // ── 가지 분기 ─────────────────────────────────────────────────────────────
-    // 가지 정보: [방향각도, 가지 위치 비율, 길이 비율]
-    final branchDefs = [
-      [-0.55, 0.72, 0.82],   // 좌 큰 가지
-      [ 0.52, 0.68, 0.78],   // 우 큰 가지
-      [-0.35, 0.88, 0.55],   // 좌 위 가지
-      [ 0.38, 0.85, 0.52],   // 우 위 가지
-      [ 0.0,  0.95, 0.45],   // 중앙 상단 가지
-    ];
-    final branchCount = ((g - 0.28) / 0.5 * branchDefs.length).clamp(0, branchDefs.length.toDouble()).floor();
-    final branchMaxLen = lp(0, 80, sstep(0.28, 0.78, g)) * fit;
+    // ── Branches ───────────────────────────────────────────────────────────────
+    final maxBranchLen = lp(0, 92, sstep(0.20, 0.85, g)) * fit;
+    final branchCount  = ((g - 0.20) / 0.60 * _branchDefs.length)
+        .clamp(0.0, _branchDefs.length.toDouble())
+        .floor();
 
-    final branchTips = <Offset>[];
+    // Collect canopy anchor points (branch tips + trunk top).
+    final canopyAnchors = <Offset>[Offset(cx, trunkTopY)];
+
     for (int bi = 0; bi < branchCount; bi++) {
-      final bd = branchDefs[bi];
-      final angle = bd[0] as double;
-      final pos   = bd[1] as double;
-      final lenFrac = bd[2] as double;
-      final brLen = branchMaxLen * lenFrac;
-      final bBase = Offset(cx, groundY - totalTrunkH * pos);
-      final bTip = Offset(
-        bBase.dx + math.sin(angle + math.pi / 2) * brLen,
-        bBase.dy - math.cos(angle + math.pi / 2) * brLen,
+      final bd      = _branchDefs[bi];
+      final angle   = bd[0];
+      final posFrac = bd[1];
+      final lenFrac = bd[2];
+
+      final bLen  = maxBranchLen * lenFrac;
+      final bBase = Offset(cx, groundY - trunkH * posFrac);
+
+      // Canvas angle: straight-up = –π/2; offset by branch angle.
+      final canvasAngle = -math.pi / 2 + angle;
+
+      final localTip = Offset(
+        math.cos(canvasAngle) * bLen,
+        math.sin(canvasAngle) * bLen,
       );
-      branchTips.add(bTip);
-      final sway = windSway(windPhase + bi * 0.1, pos, windAmp);
+      final worldTip = bBase + localTip;
+      canopyAnchors.add(worldTip);
+
+      // Wind sway pivots around the branch base.
+      final sway = windSway(windPhase + bi * 0.13, posFrac, windAmp);
       canvas.save();
       canvas.translate(bBase.dx, bBase.dy);
       canvas.rotate(sway);
-      trunkSegment(canvas, Offset.zero,
-        Offset(bTip.dx - bBase.dx, bTip.dy - bBase.dy),
-        lp(10, 4, 0) * fit, lp(10, 4, 1) * fit);
+
+      // Thickness tapers: lower branches are fatter (8 px), upper are thinner (5 px).
+      final bThickBase = lp(8, 5, bi / _branchDefs.length) * fit;
+
+      // Primary branch.
+      barkBranch(
+        canvas,
+        Offset.zero,
+        localTip,
+        bThickBase,
+        const Color(0xFF7A5C3A),
+        const Color(0xFF4A3020),
+        lenticels: bi < 2,
+        rng: rng,
+      );
+
+      // Botanical leaves along the branch (young / growing stage).
+      if (g >= 0.20 && g < 0.65) {
+        _drawBranchLeaves(canvas, localTip, bLen, fit, g, rng, angle < 0 ? -1 : 1);
+      }
+
       canvas.restore();
+
+      // Sub-branch (for the two lower main branches once growing).
+      if (bi < 2 && g > 0.42) {
+        _drawSubBranch(canvas, bBase, worldTip, angle, maxBranchLen, fit, rng, bi);
+      }
     }
 
-    // ── 잎 클러스터 (수관) ────────────────────────────────────────────────────
+    // ── Foliage canopy (g > 0.48) ─────────────────────────────────────────────
     if (g > 0.48) {
-      final season = _season(month);
-      final leafAlpha = sstep(0.48, 0.65, g);
-      final leafColors = _leafColors(month);
-
-      // 수관 중심: 가지 끝들의 무게중심
-      Offset canopyCenter = Offset(cx, trunkTopY - 20 * fit);
-      if (branchTips.isNotEmpty) {
-        double sx = 0, sy = 0;
-        for (final t in branchTips) { sx += t.dx; sy += t.dy; }
-        canopyCenter = Offset(sx / branchTips.length, sy / branchTips.length - 15 * fit);
-      }
-
-      final canopyR = lp(30, 95, sstep(0.48, 0.90, g)) * fit;
-      final clusterCount = ((g - 0.48) / 0.42 * 9 + 3).clamp(3, 12).floor();
-
-      canvas.saveLayer(Rect.fromLTWH(0, 0, size.width, size.height),
-        Paint()..color = Color.fromARGB((leafAlpha * 255).round(), 255, 255, 255));
-
-      for (int ci = 0; ci < clusterCount; ci++) {
-        final angle = ci * math.pi * 2 / clusterCount + rng.nextDouble() * 0.4;
-        final dist = rng.nextDouble() * canopyR * 0.55;
-        final center = Offset(
-          canopyCenter.dx + math.cos(angle) * dist,
-          canopyCenter.dy + math.sin(angle) * dist * 0.7,
-        );
-        final r = (canopyR * (0.45 + rng.nextDouble() * 0.35)).clamp(12.0 * fit, canopyR);
-        final col = leafColors[ci % leafColors.length];
-
-        // 수관 삼각형 클러스터 (6–8개 삼각형)
-        final facets = 7;
-        for (int fi = 0; fi < facets; fi++) {
-          final a1 = fi * math.pi * 2 / facets;
-          final a2 = (fi + 1) * math.pi * 2 / facets;
-          final r1 = r * (0.7 + rng.nextDouble() * 0.35);
-          final r2 = r * (0.7 + rng.nextDouble() * 0.35);
-          final p1 = Offset(center.dx + math.cos(a1) * r1, center.dy + math.sin(a1) * r1 * 0.8);
-          final p2 = Offset(center.dx + math.cos(a2) * r2, center.dy + math.sin(a2) * r2 * 0.8);
-          final shade = _shadeLeaf(col, fi, facets);
-          tri(canvas, center, p1, p2, shade);
-        }
-      }
-      canvas.restore();
-
-      // ── 계절별 꽃 ──────────────────────────────────────────────────────────
-      if (season == 'blossom' && g > 0.65) {
-        final blossomCount = ((g - 0.65) * 18).clamp(0, 14).floor();
-        for (int i = 0; i < blossomCount; i++) {
-          final angle = rng.nextDouble() * math.pi * 2;
-          final dist = rng.nextDouble() * canopyR * 0.72;
-          final bc = Offset(
-            canopyCenter.dx + math.cos(angle) * dist,
-            canopyCenter.dy + math.sin(angle) * dist * 0.7,
-          );
-          _drawFlower(canvas, bc, lp(5, 9, g) * fit, rng);
-        }
-      }
-
-      // ── 사과 열매 ──────────────────────────────────────────────────────────
-      if (season != 'blossom' && g > 0.82) {
-        final appleCount = ((g - 0.82) * 22).clamp(0, 14).floor();
-        for (int i = 0; i < appleCount; i++) {
-          final angle = rng.nextDouble() * math.pi * 2;
-          final dist = rng.nextDouble() * canopyR * 0.65;
-          final ac = Offset(
-            canopyCenter.dx + math.cos(angle) * dist,
-            canopyCenter.dy + math.sin(angle) * dist * 0.7,
-          );
-          _drawApple(canvas, ac, lp(6, 11, (g - 0.82) * 5) * fit, rng);
-        }
-      }
+      _drawCanopy(canvas, cx, trunkTopY, canopyAnchors, fit, g, rng);
     }
 
-    drawPot(canvas, ground, fit);
+    // ── Blossoms / apples (mature) ────────────────────────────────────────────
+    if (g >= 0.65) {
+      _drawFruitOrBlossom(canvas, cx, trunkTopY, canopyAnchors, fit, g, rng);
+    }
+
+    realisticPot(canvas, ground, fit);
     drawWiltOverlay(canvas, size, wiltFactor);
   }
 
-  String _season(int month) {
-    if (month == 3 || month == 4 || month == 5) return 'blossom';
-    if (month == 1 || month == 2 || month == 12) return 'winter';
-    return 'summer';
-  }
+  // ── Trunk: 5 barkBranch segments with gentle S-curve wobble ─────────────────
 
-  List<Color> _leafColors(int month) {
-    if (month == 10) return [const Color(0xFFE65100), const Color(0xFFF57F17), const Color(0xFFBF360C), const Color(0xFF4CAF50)];
-    if (month == 11) return [const Color(0xFF8D6E63), const Color(0xFFBF360C), const Color(0xFFE65100)];
-    if (month == 3 || month == 4 || month == 5) return [const Color(0xFF81C784), const Color(0xFF66BB6A), const Color(0xFF43A047)];
-    return [const Color(0xFF2E7D32), const Color(0xFF388E3C), const Color(0xFF43A047), const Color(0xFF1B5E20)];
-  }
+  void _drawTrunk(Canvas canvas, double cx, double groundY, double trunkH,
+      double fit, math.Random rng) {
+    const segments = 5;
+    final segH = trunkH / segments;
 
-  Color _shadeLeaf(Color base, int fi, int total) {
-    final t = (fi / total * 2 - 1).abs();
-    return Color.lerp(base, fi < total ~/ 2 ? Colors.black : Colors.white, t * 0.22)!;
-  }
+    // S-curve: accumulate a horizontal offset per segment using sin.
+    double prevX = cx;
+    double prevY = groundY;
 
-  void _drawFlower(Canvas c, Offset center, double r, math.Random rng) {
-    // 5장 꽃잎 삼각형
-    for (int i = 0; i < 5; i++) {
-      final a = i * math.pi * 2 / 5 - math.pi / 2;
-      final tip = Offset(center.dx + math.cos(a) * r * 1.8, center.dy + math.sin(a) * r * 1.8);
-      final a1 = a - 0.35;
-      final a2 = a + 0.35;
-      final p1 = Offset(center.dx + math.cos(a1) * r * 0.6, center.dy + math.sin(a1) * r * 0.6);
-      final p2 = Offset(center.dx + math.cos(a2) * r * 0.6, center.dy + math.sin(a2) * r * 0.6);
-      tri(c, p1, tip, p2, const Color(0xFFFFB7C5));
+    for (int i = 0; i < segments; i++) {
+      final frac = i / segments;
+      // Thickness tapers from 18 px (base) to 8 px (top).
+      final thick = lp(18, 8, frac) * fit;
+
+      // Gentle S-curve: sin wobble, amplitude ±4 px.
+      final wobble = math.sin(i * 0.9 + seed * 0.3) * 4 * fit;
+      final nextX  = cx + wobble;
+      final nextY  = groundY - segH * (i + 1);
+
+      // Wind sway increases with height.
+      final heightFrac = (i + 1) / segments;
+      final sway = windSway(windPhase, heightFrac, windAmp);
+      canvas.save();
+      canvas.translate(prevX, prevY);
+      canvas.rotate(sway);
+
+      barkBranch(
+        canvas,
+        Offset.zero,
+        Offset(nextX - prevX, nextY - prevY),
+        thick,
+        const Color(0xFF7A5C3A),
+        const Color(0xFF4A3020),
+        lenticels: i == 0,
+        rng: rng,
+      );
+
+      canvas.restore();
+
+      prevX = nextX;
+      prevY = nextY;
     }
-    // 수술
-    ngon(c, center, r * 0.55, 6, const Color(0xFFFFD700));
   }
 
-  void _drawApple(Canvas c, Offset center, double r, math.Random rng) {
-    // 8각형 사과 (3가지 빨강 음영)
-    final colors = [
-      const Color(0xFFE53935), const Color(0xFFD32F2F), const Color(0xFFB71C1C),
-      const Color(0xFFEF5350), const Color(0xFFD32F2F), const Color(0xFFB71C1C),
-      const Color(0xFFE53935), const Color(0xFFEF9A9A),
-    ];
-    for (int i = 0; i < 8; i++) {
-      final a1 = i * math.pi / 4 - math.pi / 8;
-      final a2 = (i + 1) * math.pi / 4 - math.pi / 8;
-      tri(c, center,
-        Offset(center.dx + math.cos(a1) * r, center.dy + math.sin(a1) * r),
-        Offset(center.dx + math.cos(a2) * r, center.dy + math.sin(a2) * r),
-        colors[i]);
+  // ── Cotyledon leaves for the sprout stage ────────────────────────────────────
+
+  void _drawCotyledons(Canvas canvas, double cx, double trunkTopY, double fit,
+      double g) {
+    final alpha = sstep(0.08, 0.20, g);
+    if (alpha <= 0) return;
+
+    // Two heart-shaped (oval) cotyledons, one each side.
+    final size = lp(6, 14, alpha) * fit;
+    final leafColors = [const Color(0xFF81C784), const Color(0xFF43A047)];
+
+    for (final side in [-1.0, 1.0]) {
+      final base = Offset(cx, trunkTopY + 2 * fit);
+      final tip  = Offset(cx + side * size * 1.6, trunkTopY - size * 1.8);
+
+      // Fade in with alpha via saveLayer.
+      canvas.saveLayer(
+        Rect.fromLTWH(tip.dx - size * 2, tip.dy - size * 2,
+            size * 4, size * 4),
+        Paint()..color = Color.fromARGB((alpha * 255).round(), 255, 255, 255),
+      );
+      botanicalLeaf(
+        canvas, base, tip, size * 0.9,
+        leafColors[0], leafColors[1],
+        vein: true,
+        veinColor: const Color(0xFF2E7D32).withValues(alpha: 0.5),
+      );
+      canvas.restore();
     }
-    // 꼭지
-    tri(c, Offset(center.dx, center.dy - r),
-      Offset(center.dx - 1.5, center.dy - r * 1.5),
-      Offset(center.dx + 1.5, center.dy - r * 1.55),
-      const Color(0xFF4A2810));
+  }
+
+  // ── Botanical leaves distributed along a branch ──────────────────────────────
+
+  void _drawBranchLeaves(Canvas canvas, Offset localTip, double bLen, double fit,
+      double g, math.Random rng, int side) {
+    final leafAlpha = sstep(0.22, 0.45, g);
+    if (leafAlpha <= 0.05) return;
+
+    final leafCount = (leafAlpha * 5 + 1).floor().clamp(1, 5);
+    for (int li = 0; li < leafCount; li++) {
+      final t         = (li + 1) / (leafCount + 1);
+      final baseLocal = localTip * t;
+      final leafAngle = -math.pi / 2 + side * (0.6 + li * 0.25);
+      final leafLen   = lp(10, 18, leafAlpha) * fit;
+      final tipLocal  = Offset(
+        baseLocal.dx + math.cos(leafAngle) * leafLen,
+        baseLocal.dy + math.sin(leafAngle) * leafLen,
+      );
+
+      canvas.saveLayer(
+        Rect.fromLTWH(baseLocal.dx - leafLen, baseLocal.dy - leafLen,
+            leafLen * 2.5, leafLen * 2.5),
+        Paint()..color = Color.fromARGB((leafAlpha * 255).round(), 255, 255, 255),
+      );
+      botanicalLeaf(
+        canvas,
+        baseLocal,
+        tipLocal,
+        leafLen * 0.38,
+        const Color(0xFF81C784),
+        const Color(0xFF2E7D32),
+        vein: true,
+      );
+      canvas.restore();
+    }
+  }
+
+  // ── Sub-branch off a primary branch ─────────────────────────────────────────
+
+  void _drawSubBranch(Canvas canvas, Offset bBase, Offset worldTip,
+      double primaryAngle, double maxBranchLen, double fit,
+      math.Random rng, int bi) {
+    final subFrac  = 0.55 + bi * 0.05;
+    final pivot    = Offset(
+      lp(bBase.dx, worldTip.dx, subFrac),
+      lp(bBase.dy, worldTip.dy, subFrac),
+    );
+    // Sub-branch veers the opposite horizontal direction.
+    final subSide  = (primaryAngle < 0) ? 1 : -1;
+    final subAngle = -math.pi / 2 + subSide * 0.30;
+    final subLen   = maxBranchLen * 0.38;
+    final subTip   = Offset(
+      pivot.dx + math.cos(subAngle) * subLen,
+      pivot.dy + math.sin(subAngle) * subLen,
+    );
+    final thick = 3.5 * fit;
+
+    final sway = windSway(windPhase + bi * 0.2, subFrac, windAmp * 1.2);
+    canvas.save();
+    canvas.translate(pivot.dx, pivot.dy);
+    canvas.rotate(sway);
+    barkBranch(
+      canvas,
+      Offset.zero,
+      subTip - pivot,
+      thick,
+      const Color(0xFF7A5C3A),
+      const Color(0xFF4A3020),
+    );
+    canvas.restore();
+  }
+
+  // ── Foliage canopy using foliageBlob ────────────────────────────────────────
+
+  void _drawCanopy(Canvas canvas, double cx, double trunkTopY,
+      List<Offset> anchors, double fit, double g, math.Random rng) {
+    final shades     = _foliageShades;
+    final leafAlpha  = sstep(0.48, 0.68, g);
+
+    // Compute canopy centroid from branch tip anchors.
+    double sx = 0, sy = 0;
+    for (final a in anchors) { sx += a.dx; sy += a.dy; }
+    final centroid = Offset(sx / anchors.length, sy / anchors.length - 12 * fit);
+
+    // Canopy radius grows with g.
+    final canopyR = lp(28, 98, sstep(0.48, 0.92, g)) * fit;
+
+    // 5–8 overlapping foliage blobs arranged in a round crown.
+    final blobCount = lp(5, 8, sstep(0.48, 0.90, g)).round();
+    final windLean  = windSway(windPhase, 1.0, windAmp) * 18;
+
+    canvas.saveLayer(
+      Rect.fromLTWH(
+          centroid.dx - canopyR - 20, centroid.dy - canopyR - 20,
+          (canopyR + 20) * 2, (canopyR + 20) * 2),
+      Paint()..color = Color.fromARGB((leafAlpha * 255).round(), 255, 255, 255),
+    );
+
+    for (int bi = 0; bi < blobCount; bi++) {
+      // Spread blobs in an elliptical crown (wider than tall).
+      final angle  = bi * math.pi * 2 / blobCount +
+          rng.nextDouble() * 0.45 +
+          // Slight rotation per rng seed for variety.
+          seed * 0.07;
+      final dist   = canopyR * (0.18 + rng.nextDouble() * 0.38);
+      final blobR  = canopyR * (0.38 + rng.nextDouble() * 0.28);
+      final center = Offset(
+        centroid.dx + math.cos(angle) * dist,
+        centroid.dy + math.sin(angle) * dist * 0.72,
+      );
+
+      foliageBlob(canvas, center, blobR, shades, rng, windLean);
+    }
+
+    canvas.restore();
+  }
+
+  // ── Blossoms (spring) or glossy apples (other seasons) ──────────────────────
+
+  void _drawFruitOrBlossom(Canvas canvas, double cx, double trunkTopY,
+      List<Offset> anchors, double fit, double g, math.Random rng) {
+    // Canopy geometry (mirrors _drawCanopy for placement).
+    double sx = 0, sy = 0;
+    for (final a in anchors) { sx += a.dx; sy += a.dy; }
+    final centroid = Offset(sx / anchors.length, sy / anchors.length - 12 * fit);
+    final canopyR  = lp(28, 98, sstep(0.48, 0.92, g)) * fit;
+
+    if (_isSpring && g > 0.72) {
+      _drawBlossoms(canvas, centroid, canopyR, fit, g, rng);
+    } else if (!_isSpring && g > 0.78) {
+      _drawApples(canvas, centroid, canopyR, fit, g, rng);
+    }
+  }
+
+  // ── Apple blossoms: clusters of 3–5 flowers ──────────────────────────────────
+
+  void _drawBlossoms(Canvas canvas, Offset centroid, double canopyR,
+      double fit, double g, math.Random rng) {
+    final blossomAlpha = sstep(0.72, 0.88, g);
+    final flowerCount  = lp(6, 22, blossomAlpha).round();
+
+    for (int i = 0; i < flowerCount; i++) {
+      final angle = rng.nextDouble() * math.pi * 2;
+      final dist  = rng.nextDouble() * canopyR * 0.80;
+      final fc    = Offset(
+        centroid.dx + math.cos(angle) * dist,
+        centroid.dy + math.sin(angle) * dist * 0.72,
+      );
+      _drawSingleBlossom(canvas, fc, lp(4, 8, blossomAlpha) * fit, rng);
+    }
+  }
+
+  void _drawSingleBlossom(Canvas canvas, Offset center, double r,
+      math.Random rng) {
+    // 5 petals via petal() utility; white to soft pink.
+    for (int pi = 0; pi < 5; pi++) {
+      final angle = pi * math.pi * 2 / 5 - math.pi / 2 +
+          rng.nextDouble() * 0.18;
+      petal(
+        canvas,
+        center,
+        r * 1.9,
+        r * 0.90,
+        angle,
+        const Color(0xFFFFF8FB),
+        const Color(0xFFFFCDD2),
+      );
+    }
+    // Stamen: yellow dot.
+    canvas.drawCircle(
+      center,
+      r * 0.32,
+      Paint()..color = const Color(0xFFFFD600),
+    );
+    // Tiny style filaments.
+    final stamenPaint = Paint()
+      ..color = const Color(0xFFFFD600).withValues(alpha: 0.75)
+      ..strokeWidth = 0.7 * (r / 6).clamp(0.5, 1.2)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    for (int si = 0; si < 5; si++) {
+      final sa = si * math.pi * 2 / 5;
+      canvas.drawLine(
+        center,
+        Offset(center.dx + math.cos(sa) * r * 0.55,
+               center.dy + math.sin(sa) * r * 0.55),
+        stamenPaint,
+      );
+    }
+  }
+
+  // ── Glossy red apples ────────────────────────────────────────────────────────
+
+  void _drawApples(Canvas canvas, Offset centroid, double canopyR,
+      double fit, double g, math.Random rng) {
+    final appleAlpha = sstep(0.78, 0.94, g);
+    final appleCount = lp(4, 7, appleAlpha).round();
+    final appleR     = lp(4, 14, (g - 0.78) / 0.22) * fit;
+
+    canvas.saveLayer(
+      Rect.fromLTWH(
+          centroid.dx - canopyR - appleR * 2,
+          centroid.dy - canopyR - appleR * 2,
+          (canopyR + appleR * 2) * 2,
+          (canopyR + appleR * 2) * 2),
+      Paint()..color = Color.fromARGB((appleAlpha * 255).round(), 255, 255, 255),
+    );
+
+    for (int i = 0; i < appleCount; i++) {
+      final angle = rng.nextDouble() * math.pi * 2;
+      final dist  = rng.nextDouble() * canopyR * 0.68;
+      final ac    = Offset(
+        centroid.dx + math.cos(angle) * dist,
+        centroid.dy + math.sin(angle) * dist * 0.72,
+      );
+
+      // Small stem above the apple.
+      canvas.drawLine(
+        Offset(ac.dx, ac.dy - appleR * 0.95),
+        Offset(ac.dx + appleR * 0.35, ac.dy - appleR * 1.55),
+        Paint()
+          ..color = const Color(0xFF4A3020)
+          ..strokeWidth = (appleR * 0.18).clamp(0.8, 2.5)
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
+      );
+
+      // Tiny leaf bract next to stem.
+      if (appleR > 7 * fit) {
+        botanicalLeaf(
+          canvas,
+          Offset(ac.dx, ac.dy - appleR),
+          Offset(ac.dx + appleR * 0.9, ac.dy - appleR * 1.6),
+          appleR * 0.28,
+          const Color(0xFF66BB6A),
+          const Color(0xFF2E7D32),
+          vein: false,
+        );
+      }
+
+      glossyFruit(
+        canvas,
+        ac,
+        appleR,
+        const Color(0xFFCC2200),
+        const Color(0xFF8B0000),
+        const Color(0xFFFF6B6B),
+      );
+
+      // Subtle apple-bottom dimple line.
+      final dimplePaint = Paint()
+        ..color = const Color(0xFF8B0000).withValues(alpha: 0.35)
+        ..strokeWidth = (appleR * 0.13).clamp(0.5, 1.5)
+        ..style = PaintingStyle.stroke;
+      canvas.drawArc(
+        Rect.fromCenter(center: ac, width: appleR * 1.1, height: appleR * 0.5),
+        0.2,
+        math.pi - 0.4,
+        false,
+        dimplePaint,
+      );
+    }
+
+    canvas.restore();
   }
 }
