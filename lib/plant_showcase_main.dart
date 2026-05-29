@@ -66,12 +66,11 @@ class _ShowcasePageState extends State<ShowcasePage>
     const amp = 0.6;
     const wilt = 0.0;
     const seed = 42;
-    final month = DateTime.now().month;
     switch (_plants[_idx]) {
       case 'appleTree':
         return AppleTreePainter(
             g: g, windPhase: windPhase, windAmp: amp,
-            wiltFactor: wilt, seed: seed, month: month);
+            wiltFactor: wilt, seed: seed, month: 8); // August — red apples
       case 'tomato':
         return TomatoPainter(
             g: g, windPhase: windPhase, windAmp: amp,
@@ -83,7 +82,7 @@ class _ShowcasePageState extends State<ShowcasePage>
       case 'cherryBlossom':
         return CherryBlossomPainter(
             g: g, windPhase: windPhase, windAmp: amp,
-            wiltFactor: wilt, seed: seed, month: month);
+            wiltFactor: wilt, seed: seed, month: 4); // April — full bloom
       case 'lavender':
         return LavenderPainter(
             g: g, windPhase: windPhase, windAmp: amp,
@@ -91,7 +90,7 @@ class _ShowcasePageState extends State<ShowcasePage>
       default:
         return AppleTreePainter(
             g: g, windPhase: windPhase, windAmp: amp,
-            wiltFactor: wilt, seed: seed, month: month);
+            wiltFactor: wilt, seed: seed, month: 8);
     }
   }
 

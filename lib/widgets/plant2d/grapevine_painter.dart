@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'paint_utils.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GrapevinePainter — realistic botanical illustration
+// GrapevinePainter — free-standing bushy grapevine tree
 //
 // Growth stages:
 //   g < 0.08           seed + pot
-//   0.08 – 0.30        trellis posts appear; thin gnarled vine climbs
-//   0.30 – 0.55        heart-shaped 5-lobed grape leaves along vine
-//   0.55 – 1.00        glossy grape clusters hang from top wire, ripening
+//   0.08 – 0.25        short gnarled trunk grows
+//   0.15 – 0.68        4-5 primary branches fan out wide
+//   0.25 – 0.82        dense round leaf crown fills in
+//   0.55 – 1.00        grape clusters hang within the leaf mass, ripening
 //                      from green → deep purple
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -55,197 +56,28 @@ class GrapevinePainter extends CustomPainter {
     }
 
     // ── Layout constants ───────────────────────────────────────────────────────
-    final postSpread = 55.0 * fit;
-    final postH = lp(20.0, 185.0, sstep(0.08, 0.88, g)) * fit;
-    final postTopY = groundY - postH;
-    final postAppear = sstep(0.08, 0.22, g);
+    final totalH = lp(20, 275, sstep(0.08, 0.92, g)) * fit;
+    final trunkH = totalH * 0.28;
+    final trunkTopY = groundY - trunkH;
+    final crownR = lp(0, 138, sstep(0.20, 0.92, g)) * fit;
+    final crownCY = trunkTopY - crownR * 0.62;
 
-    // ── Trellis posts ──────────────────────────────────────────────────────────
-    for (final side in [-1.0, 1.0]) {
-      final px = cx + side * postSpread;
-      barkBranch(
-        canvas,
-        Offset(px, groundY),
-        Offset(px, postTopY),
-        8.0 * fit,
-        Color.lerp(const Color(0xFF6D4C41), Colors.transparent, 1.0 - postAppear)!,
-        Color.lerp(const Color(0xFF3E2723), Colors.transparent, 1.0 - postAppear)!,
-        lenticels: g > 0.15,
-        rng: rng,
-      );
-
-      // Post cap — small horizontal piece at each post top
-      if (postAppear > 0.3) {
-        canvas.drawLine(
-          Offset(px - 4.0 * fit, postTopY),
-          Offset(px + 4.0 * fit, postTopY),
-          Paint()
-            ..color = const Color(0xFF4E342E).withValues(alpha: postAppear)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 9.0 * fit
-            ..strokeCap = StrokeCap.round,
-        );
-      }
+    // ── Primary branches (drawn BEHIND crown) ─────────────────────────────────
+    if (g > 0.15) {
+      _drawPrimaryBranches(canvas, cx, trunkTopY, crownR, crownCY, fit, g, rng);
     }
 
-    // ── Horizontal wire lines (35%, 60%, 85% of post height) ──────────────────
-    final wirePaint = Paint()
-      ..color = const Color(0xFF9E9E9E).withValues(alpha: postAppear)
-      ..strokeWidth = 1.5 * fit
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.butt;
+    // ── Trunk (on top of branch bases) ────────────────────────────────────────
+    _drawTrunk(canvas, cx, groundY, trunkH, fit, rng);
 
-    for (final frac in [0.35, 0.60, 0.85]) {
-      final wy = groundY - postH * frac;
-      // Slight catenary droop
-      canvas.drawPath(
-        Path()
-          ..moveTo(cx - postSpread, wy)
-          ..quadraticBezierTo(cx, wy + 3.0 * fit, cx + postSpread, wy),
-        wirePaint,
-      );
-
-      // Tensioner dots at post attachment points
-      if (postAppear > 0.5) {
-        final dotPaint = Paint()
-          ..color = const Color(0xFF757575).withValues(alpha: postAppear * 0.8);
-        for (final dSide in [-1.0, 1.0]) {
-          canvas.drawCircle(Offset(cx + dSide * postSpread, wy), 2.2 * fit, dotPaint);
-        }
-      }
+    // ── Leaf crown ────────────────────────────────────────────────────────────
+    if (g > 0.25) {
+      _drawLeafCrown(canvas, cx, crownCY, crownR, fit, g, rng);
     }
 
-    // ── Vine stems climbing the posts ─────────────────────────────────────────
-    if (g > 0.12) {
-      final vineH = lp(0.0, postH * 0.98, sstep(0.12, 0.88, g));
-
-      // Left vine — primary, thicker, climbs earlier
-      _drawGnarledVine(
-        canvas,
-        Offset(cx - postSpread * 0.52, groundY),
-        vineH, fit, -1.0,
-        math.Random(seed + 1),
-        thickBase: 5.5,
-      );
-
-      // Right vine — secondary, slightly thinner
-      if (g > 0.18) {
-        _drawGnarledVine(
-          canvas,
-          Offset(cx + postSpread * 0.52, groundY),
-          lp(0.0, postH * 0.93, sstep(0.18, 0.88, g)),
-          fit, 1.0,
-          math.Random(seed + 2),
-          thickBase: 4.5,
-        );
-      }
-
-      // Central spur — thin vine rising from pot centre
-      if (g > 0.28) {
-        _drawGnarledVine(
-          canvas,
-          Offset(cx, groundY),
-          postH * 0.25 * sstep(0.28, 0.55, g),
-          fit, 0.0,
-          math.Random(seed + 3),
-          thickBase: 3.0,
-        );
-      }
-    }
-
-    // ── Heart-shaped grape leaves ──────────────────────────────────────────────
-    if (g > 0.30) {
-      final leafProgress = sstep(0.30, 0.82, g);
-      const totalLeaves = 14;
-      final leafCount =
-          (leafProgress * totalLeaves).clamp(0.0, totalLeaves.toDouble()).floor();
-
-      // [side(-1/+1), heightFrac, xOffsetUnscaled, leafSizeUnscaled]
-      const attachDefs = <List<double>>[
-        [-1.0, 0.22, 18.0, 24.0],
-        [ 1.0, 0.28, -20.0, 22.0],
-        [-1.0, 0.36, 26.0, 27.0],
-        [ 1.0, 0.42, -24.0, 25.0],
-        [-1.0, 0.50, 22.0, 32.0],
-        [ 1.0, 0.55, -18.0, 30.0],
-        [-1.0, 0.62, 28.0, 34.0],
-        [ 1.0, 0.67, -26.0, 32.0],
-        [-1.0, 0.72, 20.0, 29.0],
-        [ 1.0, 0.76, -22.0, 28.0],
-        [-1.0, 0.82, 16.0, 26.0],
-        [ 1.0, 0.80, -18.0, 25.0],
-        [-1.0, 0.88, 14.0, 22.0],
-        [ 1.0, 0.86, -16.0, 21.0],
-      ];
-
-      for (int li = 0; li < leafCount; li++) {
-        final def    = attachDefs[li];
-        final side   = def[0];
-        final hFrac  = def[1];
-        final xOff   = def[2];
-        final leafSz = def[3];
-
-        final attach = Offset(
-          cx + side * postSpread * 0.52 + xOff * fit,
-          groundY - postH * hFrac,
-        );
-        final sway = windSway(windPhase + li * 0.19, hFrac, windAmp);
-        final baseAngle = side < 0
-            ? -(math.pi * 0.38 + li * 0.06)
-            :  (math.pi * 0.38 + li * 0.06);
-        final leafAlpha = (li == leafCount - 1 && leafProgress < 1.0)
-            ? sstep(0.0, 1.0 / totalLeaves, (leafProgress * totalLeaves) % 1.0)
-            : 1.0;
-
-        _grapeLeaf(
-          canvas, attach, leafSz * fit, baseAngle + sway,
-          li.isEven ? const Color(0xFF66BB6A) : const Color(0xFF558B2F),
-          li.isEven ? const Color(0xFF2E7D32) : const Color(0xFF1B5E20),
-          alpha: leafAlpha,
-        );
-      }
-
-      // Tendrils coiling around the lower wires (g > 0.40)
-      if (g > 0.40) {
-        final tendrilAlpha = sstep(0.40, 0.60, g);
-        final trng = math.Random(seed + 99);
-        for (final wireFrac in [0.35, 0.60]) {
-          final wy = groundY - postH * wireFrac;
-          for (final tSide in [-0.6, 0.6]) {
-            _drawTendril(
-              canvas,
-              Offset(cx + tSide * postSpread, wy - 4.0 * fit),
-              fit, trng, tendrilAlpha,
-            );
-          }
-        }
-      }
-    }
-
-    // ── Grape clusters hanging from top wire ───────────────────────────────────
+    // ── Grape clusters ────────────────────────────────────────────────────────
     if (g > 0.55) {
-      final ripeness = ((g - 0.55) * 2.2).clamp(0.0, 1.0);
-      const topWireFrac   = 0.85;
-      const clusterXFracs = <double>[-0.35, 0.35];
-
-      final clusterCount =
-          ((g - 0.55) / 0.45 * clusterXFracs.length)
-              .clamp(1.0, clusterXFracs.length.toDouble())
-              .floor();
-
-      for (int ci = 0; ci < clusterCount; ci++) {
-        final wireY = groundY - postH * topWireFrac + 2.0 * fit;
-        _drawGrapeCluster(
-          canvas,
-          Offset(cx + clusterXFracs[ci] * postSpread, wireY),
-          fit, ripeness,
-          math.Random(seed + 10 + ci),
-          windSway(windPhase + ci * 0.27, topWireFrac, windAmp),
-          ci == 0
-              ? sstep(0.55, 0.66, g)
-              : sstep(0.55 + ci * 0.07, 0.72 + ci * 0.05, g),
-        );
-      }
+      _drawGrapeClusters(canvas, cx, crownCY, crownR, fit, g, rng);
     }
 
     // ── Pot ────────────────────────────────────────────────────────────────────
@@ -254,44 +86,282 @@ class GrapevinePainter extends CustomPainter {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // _drawGnarledVine
+  // _drawTrunk: short thick gnarled trunk with bark texture
   // ────────────────────────────────────────────────────────────────────────────
 
-  void _drawGnarledVine(
-    Canvas c,
-    Offset base,
-    double height,
+  void _drawTrunk(
+    Canvas canvas,
+    double cx,
+    double groundY,
+    double trunkH,
     double fit,
-    double leanSide,
-    math.Random rng, {
-    double thickBase = 5.0,
-  }) {
-    if (height < 2.0) return;
-    const segs = 12;
-    var curX = base.dx;
-    var curY = base.dy;
+    math.Random rng,
+  ) {
+    if (trunkH < 2.0) return;
 
-    for (int i = 0; i < segs; i++) {
-      final tFrac = i / segs.toDouble();
-      final segH  = height / segs;
-      final range = (leanSide == 0 ? 6.0 : 9.0) * fit;
-      final zigzag = leanSide * (rng.nextDouble() * range - range * 0.35);
-      final nextX = curX + zigzag;
-      final nextY = curY - segH;
-      final thick = lp(thickBase, 1.5, tFrac) * fit;
+    // Gentle S-curve wobble based on seed
+    final wobble = math.sin(seed * 0.31) * 4.0 * fit;
+    final topX = cx + wobble;
+    final topY = groundY - trunkH;
+    final midX = cx + wobble * 0.45;
+    final midY = groundY - trunkH * 0.52;
+
+    final halfBase = 11.0 * fit;
+    final halfMid = 8.0 * fit;
+    final halfTop = 6.5 * fit;
+
+    // Single smooth tapered bezier trunk path
+    final trunkPath = Path()..moveTo(cx - halfBase, groundY);
+    trunkPath.quadraticBezierTo(midX - halfMid, midY, topX - halfTop, topY);
+    trunkPath.lineTo(topX + halfTop, topY);
+    trunkPath.quadraticBezierTo(midX + halfMid, midY, cx + halfBase, groundY);
+    trunkPath.close();
+
+    // 4-stop lateral LinearGradient
+    final rect = Rect.fromLTRB(
+      cx - halfBase - 2,
+      topY - 2,
+      cx + halfBase + 2,
+      groundY,
+    );
+    canvas.drawPath(
+      trunkPath,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [
+            Color(0xFF1E0D04),
+            Color(0xFF5A3A18),
+            Color(0xFF3A2208),
+            Color(0xFF1E0D04),
+          ],
+          stops: [0.0, 0.30, 0.68, 1.0],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ).createShader(rect),
+    );
+
+    // Horizontal bark texture lines (7 lines)
+    final lRng = math.Random(seed ^ 0x5C7A);
+    final lenticPaint = Paint()
+      ..color = const Color(0xFF0D0602).withValues(alpha: 0.32)
+      ..strokeWidth = 0.8 * fit
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    for (int li = 0; li < 7; li++) {
+      final lFrac = (li + 0.5) / 7.0;
+      final lY = groundY - lFrac * trunkH;
+      final lWide = halfBase * lp(1.0, 0.55, lFrac) * (0.35 + lRng.nextDouble() * 0.32);
+      final lX = cx + wobble * lFrac + (lRng.nextDouble() - 0.5) * 3.0 * fit;
+      canvas.drawLine(Offset(lX - lWide, lY), Offset(lX + lWide, lY), lenticPaint);
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // _drawPrimaryBranches: 5 wide-spreading branches from trunk top
+  // ────────────────────────────────────────────────────────────────────────────
+
+  List<Offset> _drawPrimaryBranches(
+    Canvas canvas,
+    double cx,
+    double trunkTopY,
+    double crownR,
+    double crownCY,
+    double fit,
+    double g,
+    math.Random rng,
+  ) {
+    final appear = sstep(0.15, 0.68, g);
+    final count = (appear * 5).floor().clamp(0, 5);
+
+    // Angle offsets from straight up (-PI/2)
+    const angleOffsets = <double>[-0.82, -0.44, 0.04, 0.44, 0.80];
+    final maxLen = crownR * 0.88;
+    final tips = <Offset>[];
+
+    final barkLight = const Color(0xFF5D3A1A);
+    final barkDark = const Color(0xFF2E1A08);
+
+    for (int bi = 0; bi < count; bi++) {
+      final ao = angleOffsets[bi];
+      final canvasAngle = -math.pi / 2 + ao;
+      final thick = lp(7.0, 4.0, bi / 4.0) * fit;
+
+      // Branch length fades in with appear
+      final branchLen = maxLen * appear;
+      final tipOffset = Offset(
+        math.cos(canvasAngle) * branchLen,
+        math.sin(canvasAngle) * branchLen,
+      );
+      final branchBase = Offset(cx, trunkTopY);
+      final branchTip = branchBase + tipOffset;
+      tips.add(branchTip);
+
+      // Wind sway
+      final sway = windSway(windPhase + bi * 0.17, 0.7, windAmp);
+      canvas.save();
+      canvas.translate(branchBase.dx, branchBase.dy);
+      canvas.rotate(sway);
 
       barkBranch(
-        c,
-        Offset(curX, curY),
-        Offset(nextX, nextY),
+        canvas,
+        Offset.zero,
+        tipOffset,
         thick,
-        const Color(0xFF5D4037),
-        const Color(0xFF3E2723),
-        lenticels: i < 4 && thick > 2.5,
+        barkLight,
+        barkDark,
+        lenticels: bi < 3 && thick > 3.0,
         rng: rng,
       );
-      curX = nextX;
-      curY = nextY;
+
+      // Sub-branch at 55% along if g > 0.32
+      if (g > 0.32) {
+        final subAppear = sstep(0.32, 0.72, g);
+        final subBase = tipOffset * 0.55;
+        // Sub-branch veers outward
+        final subSide = ao < 0 ? -1.0 : 1.0;
+        final subAngle = canvasAngle + subSide * 0.52;
+        final subLen = branchLen * 0.45 * subAppear;
+        final subTip = Offset(
+          subBase.dx + math.cos(subAngle) * subLen,
+          subBase.dy + math.sin(subAngle) * subLen,
+        );
+        final subThick = thick * 0.58;
+        barkBranch(
+          canvas,
+          subBase,
+          subTip,
+          subThick,
+          barkLight,
+          barkDark,
+          lenticels: false,
+          rng: rng,
+        );
+      }
+
+      canvas.restore();
+    }
+
+    return tips;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // _drawLeafCrown: dense round canopy of large grape leaves
+  // ────────────────────────────────────────────────────────────────────────────
+
+  void _drawLeafCrown(
+    Canvas canvas,
+    double cx,
+    double crownCY,
+    double crownR,
+    double fit,
+    double g,
+    math.Random rng,
+  ) {
+    final appear = sstep(0.25, 0.82, g);
+    if (appear <= 0.01) return;
+
+    final foliageShades = const <Color>[
+      Color(0xFF43A047),
+      Color(0xFF388E3C),
+      Color(0xFF2E7D32),
+      Color(0xFF1B5E20),
+    ];
+
+    final windLean = windSway(windPhase, 1.0, windAmp) * 18;
+
+    // saveLayer for appear alpha
+    final layerRect = Rect.fromCenter(
+      center: Offset(cx, crownCY),
+      width: (crownR + 30) * 2,
+      height: (crownR + 30) * 2,
+    );
+    canvas.saveLayer(
+      layerRect,
+      Paint()..color = Color.fromARGB((appear * 255).round(), 255, 255, 255),
+    );
+
+    // 7-9 foliage blobs scattered in crown area
+    final blobCount = 7 + rng.nextInt(3);
+    for (int bi = 0; bi < blobCount; bi++) {
+      final angle = bi * math.pi * 2 / blobCount +
+          rng.nextDouble() * 0.5 +
+          seed * 0.07;
+      final dist = crownR * (0.12 + rng.nextDouble() * 0.45);
+      final blobR = crownR * (0.36 + rng.nextDouble() * 0.28);
+      final center = Offset(
+        cx + math.cos(angle) * dist,
+        crownCY + math.sin(angle) * dist * 0.82,
+      );
+      foliageBlob(canvas, center, blobR, foliageShades, rng, windLean);
+    }
+
+    // 12-18 individual grape leaves scattered in crown area
+    final leafCount = 12 + rng.nextInt(7);
+    final leafRng = math.Random(seed ^ 0xA3F1);
+    for (int li = 0; li < leafCount; li++) {
+      final angle = leafRng.nextDouble() * math.pi * 2;
+      final dist = crownR * (0.05 + leafRng.nextDouble() * 0.72);
+      final attach = Offset(
+        cx + math.cos(angle) * dist,
+        crownCY + math.sin(angle) * dist * 0.85,
+      );
+      final leafSz = (18.0 + leafRng.nextDouble() * 18.0) * fit;
+      final sway = windSway(windPhase + li * 0.21, dist / crownR, windAmp);
+      final leafAngle = angle + math.pi * 0.5 + sway;
+
+      final useAlt = li.isEven;
+      _grapeLeaf(
+        canvas,
+        attach,
+        leafSz,
+        leafAngle,
+        useAlt ? const Color(0xFF66BB6A) : const Color(0xFF558B2F),
+        useAlt ? const Color(0xFF2E7D32) : const Color(0xFF1B5E20),
+      );
+    }
+
+    canvas.restore();
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // _drawGrapeClusters: clusters hanging within the leaf mass
+  // ────────────────────────────────────────────────────────────────────────────
+
+  void _drawGrapeClusters(
+    Canvas canvas,
+    double cx,
+    double crownCY,
+    double crownR,
+    double fit,
+    double g,
+    math.Random rng,
+  ) {
+    final ripeness = ((g - 0.55) * 2.2).clamp(0.0, 1.0);
+    final clusterCount = ((g - 0.55) / 0.45 * 5).clamp(1.0, 5.0).floor();
+
+    final clusterRng = math.Random(seed ^ 0x7F3C);
+
+    for (int ci = 0; ci < clusterCount; ci++) {
+      final angle = ci * math.pi * 2 / 5 + clusterRng.nextDouble() * 0.7;
+      final dist = crownR * (0.18 + clusterRng.nextDouble() * 0.42);
+      final wireAttach = Offset(
+        cx + math.cos(angle) * dist,
+        crownCY + math.sin(angle) * dist * 0.85,
+      );
+
+      final alpha = ci == 0
+          ? sstep(0.55, 0.66, g)
+          : sstep(0.55 + ci * 0.07, 0.72 + ci * 0.05, g);
+
+      _drawGrapeCluster(
+        canvas,
+        wireAttach,
+        fit,
+        ripeness,
+        math.Random(seed + 10 + ci),
+        windSway(windPhase + ci * 0.27, 0.75, windAmp),
+        alpha,
+      );
     }
   }
 

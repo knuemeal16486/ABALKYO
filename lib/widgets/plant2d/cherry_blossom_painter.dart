@@ -109,13 +109,34 @@ class CherryBlossomPainter extends CustomPainter {
     if (g > 0.55) {
       final crownFrac = sstep(0.55, 0.90, g);
 
-      for (final tip in branchTips) {
+      // Compute crown centroid from branch tips
+      if (branchTips.isNotEmpty) {
+        double sx = 0, sy = 0;
+        for (final t in branchTips) { sx += t.dx; sy += t.dy; }
+        final crownCx = sx / branchTips.length;
+        final crownCy = sy / branchTips.length - 10 * fit;
+        final crownR  = lp(20, 105, crownFrac) * fit;
+
         if (isSpring) {
-          _drawBlossomCluster(canvas, tip, fit, crownFrac, math.Random(seed ^ tip.hashCode), windPhase);
+          // Dense pink blossom cloud filling the crown
+          _drawBlossomCloud(canvas, Offset(crownCx, crownCy), crownR, fit, crownFrac, rng);
         } else if (!isWinter) {
-          _drawLeafCluster(canvas, tip, fit, crownFrac, math.Random(seed ^ tip.hashCode), isFall);
+          // Green/autumn leaf cloud
+          _drawLeafCloud(canvas, Offset(crownCx, crownCy), crownR, fit, crownFrac, rng, isFall);
         }
-        // Winter: bare branches only — no crown drawn
+      }
+
+      // Additional individual flower clusters on top of the cloud (spring only)
+      if (isSpring) {
+        for (final tip in branchTips) {
+          _drawBlossomCluster(canvas, tip, fit, crownFrac,
+              math.Random(seed ^ tip.hashCode), windPhase);
+        }
+      } else if (!isWinter) {
+        for (final tip in branchTips) {
+          _drawLeafCluster(canvas, tip, fit, crownFrac,
+              math.Random(seed ^ tip.hashCode), isFall);
+        }
       }
 
       // Falling petals
@@ -436,6 +457,78 @@ class CherryBlossomPainter extends CustomPainter {
         veinColor: leafDark.withValues(alpha: 0.50),
       );
     }
+  }
+
+  // ── Dense pink blossom cloud (spring crown fill) ──────────────────────────
+  void _drawBlossomCloud(Canvas canvas, Offset center, double crownR,
+      double fit, double frac, math.Random rng) {
+    if (frac <= 0.01) return;
+
+    const pinkShades = <Color>[
+      Color(0xFFFFB7C5),
+      Color(0xFFFF8FAB),
+      Color(0xFFFFC8D4),
+      Color(0xFFFF9EBA),
+    ];
+
+    final blobCount = (frac * 10).round().clamp(4, 10);
+    final windLean  = windSway(windPhase, 1.0, windAmp) * 14;
+
+    // Fully opaque base — eliminates all blob boundary artifacts
+    final baseAlpha = frac.clamp(0.0, 1.0);
+    canvas.drawCircle(
+      center,
+      crownR * 0.96,
+      Paint()..color = const Color(0xFFFFB7C5).withValues(alpha: baseAlpha),
+    );
+
+    // Subtle blob texture layer (low overall alpha so base stays dominant)
+    canvas.saveLayer(
+      Rect.fromCircle(center: center, radius: crownR + 15),
+      Paint()..color = Color.fromARGB((frac * 120).round(), 255, 255, 255),
+    );
+
+    for (int bi = 0; bi < blobCount; bi++) {
+      final angle  = bi * math.pi * 2 / blobCount + rng.nextDouble() * 0.5 + seed * 0.07;
+      final dist   = crownR * (0.04 + rng.nextDouble() * 0.38);
+      final blobR  = crownR * (0.44 + rng.nextDouble() * 0.28);
+      final bCenter = Offset(
+        center.dx + math.cos(angle) * dist,
+        center.dy + math.sin(angle) * dist * 0.78,
+      );
+      foliageBlob(canvas, bCenter, blobR, pinkShades, rng, windLean);
+    }
+
+    canvas.restore();
+  }
+
+  // ── Green/autumn leaf cloud (non-spring crown fill) ───────────────────────
+  void _drawLeafCloud(Canvas canvas, Offset center, double crownR,
+      double fit, double frac, math.Random rng, bool isFall) {
+    if (frac <= 0.01) return;
+
+    final shades = isFall
+        ? const <Color>[Color(0xFFE65100), Color(0xFFF57F17), Color(0xFFBF360C)]
+        : const <Color>[Color(0xFF81C784), Color(0xFF4CAF50), Color(0xFF2E7D32)];
+
+    final blobCount = (frac * 8).round().clamp(3, 8);
+    final windLean  = windSway(windPhase, 1.0, windAmp) * 14;
+
+    canvas.saveLayer(
+      Rect.fromCircle(center: center, radius: crownR + 12),
+      Paint()..color = Color.fromARGB((frac * 255).round(), 255, 255, 255),
+    );
+    for (int bi = 0; bi < blobCount; bi++) {
+      final angle  = bi * math.pi * 2 / blobCount + rng.nextDouble() * 0.5;
+      final dist   = crownR * (0.08 + rng.nextDouble() * 0.40);
+      final blobR  = crownR * (0.35 + rng.nextDouble() * 0.25);
+      final bc = Offset(
+        center.dx + math.cos(angle) * dist,
+        center.dy + math.sin(angle) * dist * 0.80,
+      );
+      foliageBlob(canvas, bc, blobR, shades, rng, windLean);
+    }
+    canvas.restore();
   }
 
   // ── Falling petals (spring, g > 0.72) ────────────────────────────────────

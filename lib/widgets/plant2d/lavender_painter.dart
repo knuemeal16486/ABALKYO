@@ -80,10 +80,10 @@ class LavenderPainter extends CustomPainter {
         ((g - 0.08) / 0.52 * 8.0 + 8.0).clamp(8.0, 16.0).floor();
 
     // Length grows quickly in the early stage then levels off
-    final leafLen = lp(15.0, 50.0, sstep(0.08, 0.60, g)) * fit;
+    final leafLen = lp(20.0, 62.0, sstep(0.08, 0.60, g)) * fit;
 
     // Lavender leaves are characteristically very narrow (linear-lanceolate)
-    final leafWidth = leafLen * 0.12;
+    final leafWidth = leafLen * 0.15;
 
     // Crown of the plant — leaves emerge a few px above the soil
     final base = Offset(cx, groundY - 5.0 * fit);
@@ -129,56 +129,54 @@ class LavenderPainter extends CustomPainter {
   // ── All stems, bracts, and spikes (g > 0.40) ──────────────────────────────
 
   void _drawAllStems(Canvas canvas, double cx, double groundY, double fit) {
-    // Number of stems grows from 3 to 9 as g moves through 0.40→0.65
-    final stemCount =
-        ((g - 0.40) / 0.25 * 7.0).clamp(3.0, 7.0).floor();
-
-    // X offsets from cx: centre first, then alternating ±22, ±44, ±66 (px)
-    final stemXOffsets = _buildStemOffsets(stemCount, fit);
-
-    // Total height budget (stem + spike) — starts at 0 and grows to 190 px
-    final totalMaxH = lp(0.0, 190.0, sstep(0.40, 1.0, g)) * fit;
-
-    // Spike length grows only after g = 0.65, reaches ~40 px at full bloom
-    final spikeLen = lp(0.0, 40.0, sstep(0.65, 1.0, g)) * fit;
-
-    // Stem height is the remainder of the budget once spike is accounted for
-    final stemH = (totalMaxH - spikeLen).clamp(0.0, totalMaxH);
-
-    // Absolute ceiling — stem tip must not exceed this y-value
-    final stemTopCeiling = groundY - 200.0 * fit;
+    final stemCount = ((g - 0.40) / 0.25 * 18.0).clamp(3.0, 18.0).floor();
+    final totalMaxH = lp(0.0, 185.0, sstep(0.40, 1.0, g)) * fit;
+    final spikeLen  = lp(0.0, 38.0, sstep(0.65, 1.0, g)) * fit;
+    final stemH     = (totalMaxH - spikeLen).clamp(0.0, totalMaxH);
+    final stemTopCeiling = groundY - 195.0 * fit;
 
     for (int si = 0; si < stemCount; si++) {
-      final stemX = cx + stemXOffsets[si];
+      // All stems emerge from a compact crown; lean angle drives the fountain spread
+      final double baseXOff;
+      final double leanAngle; // radians from vertical (0=straight up)
+      if (si == 0) {
+        baseXOff  = 0.0;
+        leanAngle = 0.0;
+      } else {
+        final pair = (si + 1) ~/ 2; // 1,1,2,2,3,3,... symmetric pairs
+        final sign = (si % 2 == 1) ? -1.0 : 1.0;
+        baseXOff  = sign * pair * 2.5 * fit; // tight base — spread is from lean only
+        // Fountain lean: pair 1→5°, pair 4→18°, pair 8→32° (max 0.55 rad ≈ 31.5°)
+        leanAngle = sign * (pair * 0.07 + 0.02).clamp(0.0, 0.55);
+      }
 
-      // Seed-stable lean so outer stems have a gentle natural splay
-      final leanX = (_pseudoRand(seed + si * 37) - 0.5) * 10.0 * fit;
+      final stemBase = Offset(cx + baseXOff, groundY);
 
-      // Wind sway angle — evaluated at full stem height fraction
-      final stemSway = windSway(windPhase + si * 0.29, 1.0, windAmp);
-      final swayDx = math.sin(stemSway) * stemH * 0.14;
+      // Wind sway
+      final swayRad = windSway(windPhase + si * 0.29, 1.0, windAmp);
+      final totalAngle = leanAngle + swayRad;
 
-      final stemBase = Offset(stemX, groundY);
+      // Seed-stable extra lean
+      final extraLean = (_pseudoRand(seed + si * 37) - 0.5) * 0.08;
 
-      // Clamp tip so stem never clips above the safe ceiling
-      final rawTipY = groundY - stemH;
-      final tipY = rawTipY < stemTopCeiling ? stemTopCeiling : rawTipY;
-      final stemTip = Offset(stemX + leanX + swayDx, tipY);
+      final finalAngle = totalAngle + extraLean;
+      // Stem tip: apply lean angle
+      final rawTipX = stemBase.dx + math.sin(finalAngle) * stemH;
+      final rawTipY = stemBase.dy - math.cos(finalAngle) * stemH;
+      final tipY    = rawTipY < stemTopCeiling ? stemTopCeiling : rawTipY;
+      final stemTip = Offset(rawTipX, tipY);
 
-      // ── Stem body ─────────────────────────────────────────────────────────
       barkBranch(
         canvas,
         stemBase,
         stemTip,
         1.8 * fit,
-        const Color(0xFF8D9E6A), // green-grey herb stem
-        const Color(0xFF5E6B3F), // shadow side
+        const Color(0xFF8D9E6A),
+        const Color(0xFF5E6B3F),
       );
 
-      // ── Paired bracts (tiny leaves) along the stem ────────────────────────
       _drawStemBracts(canvas, stemBase, stemTip, fit);
 
-      // ── Flower spike at stem tip (g > 0.65) ───────────────────────────────
       if (g > 0.65 && spikeLen > 1.5 * fit) {
         final bloomFrac = sstep(0.65, 1.0, g);
         _drawLavenderSpike(canvas, stemTip, spikeLen, fit, bloomFrac, si);
@@ -279,7 +277,7 @@ class LavenderPainter extends CustomPainter {
     final midX = stemTip.dx + swayDx * 0.5;
     final topY = stemTip.dy - actualLen;
 
-    final spikeW = 5.5 * fit;
+    final spikeW = 2.8 * fit;
     final bodyLeft = midX - spikeW;
     final bodyRight = midX + spikeW;
     final bodyTop = topY - spikeW * 0.55;
@@ -371,24 +369,6 @@ class LavenderPainter extends CustomPainter {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-
-  /// Returns pixel x-offsets from cx for [count] stems.
-  ///
-  /// Pattern: stem 0 → 0, stem 1 → –22*fit, stem 2 → +22*fit,
-  ///          stem 3 → –44*fit, stem 4 → +44*fit, stem 5 → –66*fit …
-  List<double> _buildStemOffsets(int count, double fit) {
-    final out = <double>[];
-    for (int i = 0; i < count; i++) {
-      if (i == 0) {
-        out.add(0.0);
-      } else {
-        final pair = ((i + 1) / 2).ceil(); // 1,2→1  3,4→2  5,6→3 …
-        final sign = (i % 2 == 1) ? -1.0 : 1.0;
-        out.add(sign * pair * 22.0 * fit);
-      }
-    }
-    return out;
-  }
 
   /// Deterministic pseudo-random value in [0, 1) for [key].
   ///

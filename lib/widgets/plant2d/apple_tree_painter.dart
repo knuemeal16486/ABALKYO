@@ -45,7 +45,7 @@ class AppleTreePainter extends CustomPainter {
     if (_isFall) {
       return const [Color(0xFFE65100), Color(0xFFF57F17), Color(0xFFBF360C)];
     }
-    return const [Color(0xFF2E7D32), Color(0xFF388E3C), Color(0xFF4CAF50)];
+    return const [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF388E3C), Color(0xFF43A047)];
   }
 
   // ── Branch definitions [angleRad, trunkPosFrac, lengthFrac] ────────────────
@@ -357,10 +357,10 @@ class AppleTreePainter extends CustomPainter {
     final centroid = Offset(sx / anchors.length, sy / anchors.length - 12 * fit);
 
     // Canopy radius grows with g.
-    final canopyR = lp(28, 98, sstep(0.48, 0.92, g)) * fit;
+    final canopyR = lp(30, 115, sstep(0.48, 0.92, g)) * fit;
 
     // 5–8 overlapping foliage blobs arranged in a round crown.
-    final blobCount = lp(5, 8, sstep(0.48, 0.90, g)).round();
+    final blobCount = lp(6, 11, sstep(0.48, 0.90, g)).round();
     final windLean  = windSway(windPhase, 1.0, windAmp) * 18;
 
     canvas.saveLayer(
@@ -387,6 +387,29 @@ class AppleTreePainter extends CustomPainter {
     }
 
     canvas.restore();
+
+    // Individual leaves peeking at crown edges for realism
+    final edgeLeafCount = lp(6, 18, sstep(0.60, 0.95, g)).round();
+    final edgeRng = math.Random(seed ^ 0xABCD);
+    final leafColors = _foliageShades;
+    for (int eli = 0; eli < edgeLeafCount; eli++) {
+      final angle   = eli * math.pi * 2 / edgeLeafCount + edgeRng.nextDouble() * 0.6;
+      final dist    = canopyR * (0.62 + edgeRng.nextDouble() * 0.30);
+      final leafLen = (12.0 + edgeRng.nextDouble() * 10.0) * fit;
+      final base    = Offset(
+        centroid.dx + math.cos(angle) * dist,
+        centroid.dy + math.sin(angle) * dist * 0.80,
+      );
+      final tip = Offset(
+        base.dx + math.cos(angle) * leafLen,
+        base.dy + math.sin(angle) * leafLen * 0.80,
+      );
+      botanicalLeaf(
+        canvas, base, tip, leafLen * 0.36,
+        leafColors[0], leafColors.last,
+        vein: eli % 3 == 0,
+      );
+    }
   }
 
   // ── Blossoms (spring) or glossy apples (other seasons) ──────────────────────
@@ -468,8 +491,11 @@ class AppleTreePainter extends CustomPainter {
   void _drawApples(Canvas canvas, Offset centroid, double canopyR,
       double fit, double g, math.Random rng) {
     final appleAlpha = sstep(0.78, 0.94, g);
-    final appleCount = lp(4, 7, appleAlpha).round();
+    final appleCount = lp(8, 18, appleAlpha).round();
     final appleR     = lp(4, 14, (g - 0.78) / 0.22) * fit;
+
+    // Dedicated RNG so apple layout is independent of prior canvas draw order
+    final appleRng = math.Random(seed ^ 0xA5B2C3);
 
     canvas.saveLayer(
       Rect.fromLTWH(
@@ -481,8 +507,10 @@ class AppleTreePainter extends CustomPainter {
     );
 
     for (int i = 0; i < appleCount; i++) {
-      final angle = rng.nextDouble() * math.pi * 2;
-      final dist  = rng.nextDouble() * canopyR * 0.68;
+      // Sector-based spread: evenly divides the circle so apples don't cluster
+      final sectorAngle = math.pi * 2 / appleCount;
+      final angle = i * sectorAngle + appleRng.nextDouble() * sectorAngle * 0.8;
+      final dist  = (0.25 + appleRng.nextDouble() * 0.55) * canopyR;
       final ac    = Offset(
         centroid.dx + math.cos(angle) * dist,
         centroid.dy + math.sin(angle) * dist * 0.72,
